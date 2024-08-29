@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="ECEformer",
@@ -7,7 +7,9 @@ setup(
     url="https://github.com/seeyourmind/ECEformer",
     author="USTB",
     author_email="xs.b12345@ustb.edu",
-    packages=["kge"],
+    # packages=["kge"],
+    packages=find_packages(),
+    package_data={'': ['*.yaml']},
     install_requires=[
         "torch==1.12.1",
         "pyyaml",
