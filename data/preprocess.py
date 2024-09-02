@@ -5,7 +5,7 @@ Call as `preprocess.py --folder <name>`. The original dataset should be stored i
 subfolder `name` and have files "train.txt", "valid.txt", and "test.txt". Each file
 contains one SPO triple per line, separated by tabs.
 
-During preprocessing, each distinct entity name and each distinct distinct relation name
+During preprocessing, each distinct entity name and each distinct relation name
 is assigned an index (dense). The index-to-object mapping is stored in files
 "entity_map.del" and "relation_map.del", resp. The triples (as indexes) are stored in
 files "train.del", "valid.del", and "test.del". Metadata information is stored in a file
