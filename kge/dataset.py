@@ -19,6 +19,7 @@ from kge.misc import kge_base_dir
 from typing import Dict, List, Any, Callable, Union, Optional
 
 
+# todo 这个父类 Configurable 虽然跟 Config 类都定义在 config.py 这个文件里，但是跟 Config 这个类毫无关系。
 class Dataset(Configurable):
     """Stores information about a dataset.
 
@@ -103,6 +104,7 @@ class Dataset(Configurable):
         if folder is None:
             folder = os.path.join(kge_base_dir(), "data", name)
         if os.path.isfile(os.path.join(folder, "dataset.yaml")):
+            # todo 这个 dataset.yaml 跟配置文件里的 yaml 没有关系，它是在 preprocess 的时候生成的，里面记录了数据集的基本情况
             config.log("Loading configuration of dataset " + name + "...")
             config.load(os.path.join(folder, "dataset.yaml"))
 
