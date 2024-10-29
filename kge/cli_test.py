@@ -299,6 +299,7 @@ def main():
                         "No checkpoint found or specified, starting from scratch..."
                     )
             else:
+                # 里面会根据参数使用不同的 Job 子类完成实例化
                 job = Job.create(config, dataset)
             job.run()
     except BaseException as e:
