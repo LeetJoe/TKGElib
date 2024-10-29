@@ -16,6 +16,8 @@ from kge.util.package import package_model, add_package_parser
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
+
+# 一个识别 bool 型参数的方法，没太大用
 def argparse_bool_type(v):
     "Type for argparse that correctly treats Boolean values"
     if isinstance(v, bool):
@@ -28,6 +30,7 @@ def argparse_bool_type(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
+# 对于 “meta command”，检查那些有固定的参数的值是否是固定的，否则抛出一个异常
 def process_meta_command(args, meta_command, fixed_args):
     """Process&update program arguments for meta commands.
 
@@ -38,15 +41,17 @@ def process_meta_command(args, meta_command, fixed_args):
     """
     if args.command == meta_command:
         for k, v in fixed_args.items():
+            # vars() 内置方法可以把一个对象转换成键值对的形式，包括那些乱七八糟的 __xx__ 属性
             if k != "command" and vars(args)[k] and vars(args)[k] != v:
                 raise ValueError(
                     "invalid argument for '{}' command: --{} {}".format(
                         meta_command, k, v
                     )
                 )
-            vars(args)[k] = v
+            vars(args)[k] = v  # 奇怪的写法，这个可以直接在 args 上应用修改？？
 
 
+# 定义了一个复杂的 parser, 一个主 parser 带好几个 subparsers，用于处理各类不同的任务。
 def create_parser(config, additional_args=[]):
     # define short option names
     short_options = {
@@ -60,9 +65,9 @@ def create_parser(config, additional_args=[]):
     parser_conf = argparse.ArgumentParser(add_help=False)
     for key, value in Config.flatten(config.options).items():
         short = short_options.get(key)
-        argtype = type(value)
+        argtype = type(value)  # 这里只用的 value 的 type，而没有使用其值，这里的 config 是空的，只是为了对齐参数类型
         if argtype == bool:
-            argtype = argparse_bool_type
+            argtype = argparse_bool_type  # 前面的转换函数
         if short:
             parser_conf.add_argument("--" + key, short, type=argtype)
         else:
@@ -88,7 +93,7 @@ def create_parser(config, additional_args=[]):
     subparsers = parser.add_subparsers(title="command", dest="command")
     subparsers.required = True
 
-    # start and its meta-commands
+    # start and its meta-commands， subparsers 可以包含多个 parser
     parser_start = subparsers.add_parser(
         "start", help="Start a new job (create and run it)", parents=[parser_conf]
     )
@@ -96,7 +101,7 @@ def create_parser(config, additional_args=[]):
         "create", help="Create a new job (but do not run it)", parents=[parser_conf]
     )
     for p in [parser_start, parser_create]:
-        p.add_argument("config", type=str, nargs="?")
+        p.add_argument("config", type=str, nargs="?")  # nargs 表示参数的数量，跟正则表达式里的表达是一样的
         p.add_argument("--folder", "-f", type=str, help="Output folder to use")
         p.add_argument(
             "--run",
@@ -154,7 +159,7 @@ def main():
         )
         args = parser.parse_args()
 
-    # process meta-commands
+    # process meta-commands，约束检查，对于参数组合中，指定“主命令”里的某些“子命令”，值必须是固定的。fixed_args 里的 command 不参与约束。
     process_meta_command(args, "create", {"command": "start", "run": False})
     process_meta_command(args, "eval", {"command": "resume", "job.type": "eval"})
     process_meta_command(
@@ -163,17 +168,17 @@ def main():
     process_meta_command(
         args, "valid", {"command": "resume", "job.type": "eval", "eval.split": "valid"}
     )
-    # dump command
+    # dump command， trace/checkpoint/config 都可以 dump
     if args.command == "dump":
         dump(args)
         exit()
 
-    # package command
+    # package command，打包保存，包括 config, dataset, checkpoint 或者 model 一堆
     if args.command == "package":
         package_model(args)
         exit()
 
-    # start command
+    # start command：主要是加载 config 文件
     if args.command == "start":
         # use toy config file if no config given
         if args.config is None:
@@ -187,8 +192,9 @@ def main():
             print("Loading configuration {}...".format(args.config))
         config.load(args.config)
 
-    # resume command
+    # resume command：主要是加载 config 文件
     if args.command == "resume":
+        # 所以这里的 args.config 开始实际上是个目录，不是文件也不是 config 对象
         if os.path.isdir(args.config) and os.path.isfile(args.config + "/config.yaml"):
             args.config += "/config.yaml"
         if args.verbose != False:
@@ -204,7 +210,7 @@ def main():
 
     # overwrite configuration with command line arguments
     for key, value in vars(args).items():
-        if key in [
+        if key in [  # 这些参数不允许通过命令行参数覆盖
             "command",
             "config",
             "run",
@@ -256,7 +262,7 @@ def main():
         config.log(yaml.dump(config.options), prefix="  ")
         config.log("git commit: {}".format(get_git_revision_short_hash()), prefix="  ")
 
-        # set random seeds
+        # set random seeds，不同模块的随机种子单独加载和设置
         if config.get("random_seed.python") > -1:
             import random
 
@@ -271,22 +277,23 @@ def main():
             numpy.random.seed(config.get("random_seed.numpy"))
 
         # let's go
-        if args.command == "start" and not args.run:
+        if args.command == "start" and not args.run:  # 可以仅 start 不 run —— 做完上面的工作就结束了
             config.log("Job created successfully.")
         else:
             # load data
             dataset = Dataset.create(config)
 
-            # let's go
+            # 如果是 resume，尝试加载 checkpoint
             if args.command == "resume":
                 if checkpoint_file is not None:
                     checkpoint = load_checkpoint(
                         checkpoint_file, config.get("job.device")
                     )
-                    job = Job.create_from(
+                    job = Job.create_from(  # 有 checkpoint 用的是 create_from
                         checkpoint, new_config=config, dataset=dataset
                     )
                 else:
+                    # 如果没有指定 checkpoint，从零开始训练，并不中止。打个日志，执行 create，跟其它 command 执行方式相同（见下方）。
                     job = Job.create(config, dataset)
                     job.config.log(
                         "No checkpoint found or specified, starting from scratch..."
