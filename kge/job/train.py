@@ -1101,16 +1101,19 @@ class TrainingJob1vsAll(TrainingJob):
         # forward/backward pass (po)
         forward_time -= time.time()
         # 通过 Eceformer(KgeModel) 的 forward 执行，其中第一个参数 score_po 是实际执行的函数名。
-        # score_po 使用 p, o, t 来预测 s，其中 gt_ent, gt_rel, gt_tim 分别是 triples 里的所有实体、关系和时间。
+        # score_po 使用 p, o, t 来预测 s，其中 gt_ent, gt_rel, gt_tim 分别是 triples 里的所有实体、关系和时间，具体怎么用见
+        # todo eceformer._get_encoder_output()，看起来很复杂，需要进一步研读。
         loss_value_po = self.model("score_po", triples[:, 1], triples[:, 2], triples[:, 3],
                                 gt_ent=triples[:, 0], gt_rel=triples[:, 1], gt_tim = triples[:, 3]).sum() / batch_size
         loss_value += loss_value_po.item()
         forward_time += time.time()
         backward_time -= time.time()
-        (loss_value_po + loss_value_sp).backward()
+        (loss_value_po + loss_value_sp).backward()  # todo sp 和 po 一起做的 backward()? 和分别做有什么区别？
         backward_time += time.time()
 
         # all done
+        # 这个方法没有重载，都是用的 TrainingJob 里的实现。里面的这几个参数除了 loss_value, 其它都是配置或者是运行时间。
+        # _ProcessBatchResult 是个很简单的属性类，这里调用就只是创建了一个很简单的实例，其中的属性记录了本次训练任务的一些结果指标。
         return TrainingJob._ProcessBatchResult(
             loss_value, batch_size, prepare_time, forward_time, backward_time
         )
