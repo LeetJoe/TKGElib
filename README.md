@@ -34,6 +34,8 @@ Configurations for the experiments are in the `/config` folder.
 
 ``` sh
 python -m kge start config/gdelt-best.yaml
+
+python -m kge resume <saved_dir>
 ```
 
 The training process uses DataParallel in all visible GPUs by default, which can be overrode by appending `--job.device cpu` to the command above.

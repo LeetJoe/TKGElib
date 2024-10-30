@@ -138,6 +138,8 @@ class TrainingJob(Job):
             # perhaps TODO: try class with specified name -> extensibility
             raise ValueError("train.type")
 
+
+    # TrainingJob 的其它子类并没有再重载这个方法，都是走的这个方法。
     def run(self) -> None:
         """Start/resume the training job and run to completion."""
         self.config.log("Starting training...")
