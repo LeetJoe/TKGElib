@@ -1064,6 +1064,8 @@ class TrainingJob1vsAll(TrainingJob):
             return
 
         self.num_examples = self.dataset.split(self.train_split).size(0)
+        # 这里的 loader 并不是使用真实数据生成的，而是使用的 range(train_number)，抽样得到的 batch 实际上是下标列表，需要再使用这个
+        # 下标列表去真实的训练数据集中获取真正的训练数据。
         self.loader = torch.utils.data.DataLoader(
             range(self.num_examples),
             collate_fn=lambda batch: {
@@ -1098,6 +1100,8 @@ class TrainingJob1vsAll(TrainingJob):
 
         # forward/backward pass (po)
         forward_time -= time.time()
+        # 通过 Eceformer(KgeModel) 的 forward 执行，其中第一个参数 score_po 是实际执行的函数名。
+        # score_po 使用 p, o, t 来预测 s，其中 gt_ent, gt_rel, gt_tim 分别是 triples 里的所有实体、关系和时间。
         loss_value_po = self.model("score_po", triples[:, 1], triples[:, 2], triples[:, 3],
                                 gt_ent=triples[:, 0], gt_rel=triples[:, 1], gt_tim = triples[:, 3]).sum() / batch_size
         loss_value += loss_value_po.item()

@@ -114,6 +114,7 @@ class ECEformerScorer(RelationalScorer):
 
         if self.training and not output_repr:
             # mask out ground truth during training to avoid overfitting
+            # view 是 reshape 函数，也即 gt_ent 原本是 x * y = n 的矩阵，view(n, 1) 把它变成了 n * 1 的矩阵。
             gt_mask = ((entity_ids != gt_ent.view(n, 1)) | (relation_ids != gt_rel.view(n, 1))) | (time_ids != gt_tim.view(n, 1))
             ctx_random_mask = (attention_mask
                                .new_ones((n, self.max_context_size))
@@ -233,6 +234,7 @@ class ECEformerScorer(RelationalScorer):
         attention_mask = (1.0 - attention_mask.float()) * -10000.0
         return attention_mask
 
+    # ids 是 o(for sp_) 或 s(for _po) 里的实体列表(?)
     def _scoring(self, s_emb, p_emb, o_emb, t_emb, is_pairwise, ids, gt_ent, gt_rel, gt_tim, t_ids):
         encoder_output, self_pred_loss = self._get_encoder_output(s_emb, p_emb, t_emb, ids, gt_ent, gt_rel, gt_tim, t_ids)
         o_emb = F.dropout(o_emb, p=self.get_option("output_dropout"), training=self.training)
@@ -309,6 +311,7 @@ class ECEformer(KgeModel):
                 "undirected spo scores."
             )
 
+    # 上层调用的时候，o 不一定给，实际上在 1vsAll training 中 o 就是没传，函数里会自动初始化，之后把 s, p, o, t 的嵌入表示传入下一步。
     def score_sp(self, s: Tensor, p: Tensor, t: Tensor, o: Tensor = None, gt_ent=None, gt_rel=None, gt_tim=None) -> Tensor:
         s_emb = self.get_s_embedder().embed(s)
         p_emb = self.get_p_embedder().embed(p)
@@ -318,6 +321,7 @@ class ECEformer(KgeModel):
         else:
             o_emb = self.get_o_embedder().embed(o)
 
+        # 这个 score_emb 函数在 KgeModel 里有定义，在 eceformer 里重载了，看本类里的那个重载后的即可
         return self._scorer.score_emb(s_emb, p_emb, o_emb, t_emb, "sp_", s, None, gt_ent, gt_rel, gt_tim, t)
 
     def score_po(self, p: Tensor, o: Tensor, t: Tensor, s: Tensor = None, gt_ent=None, gt_rel=None, gt_tim=None) -> Tensor:
