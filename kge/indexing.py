@@ -22,6 +22,7 @@ def _group_by(keys, values) -> dict:
     return OrderedDict(result)
 
 
+# 把 split 里的数据按 key 指定的模式包装成 {(s, p): [o1, o2, ...]} 这样的形式，根据 key in {sp, po, so} 不同有不同的组织结果
 def index_KvsAll(dataset: "Dataset", split: str, key: str):
     """Return an index for the triples in split (''train'', ''valid'', ''test'')
     from the specified key (''sp'' or ''po'' or ''so'') to the indexes of the
@@ -345,6 +346,7 @@ def create_default_index_functions(dataset: "Dataset"):
     for split in dataset.files_of_type("triples"):
         for key, value in [("sp", "o"), ("po", "s"), ("so", "p")]:
             # self assignment needed to capture the loop var
+            # IndexWrapper 这个方法类似 map() 函数，把后面的数据应用到第一个参数指定的函数里处理
             dataset.index_functions[f"{split}_{key}_to_{value}"] = IndexWrapper(
                 index_KvsAll, split=split, key=key
             )

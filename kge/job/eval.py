@@ -72,10 +72,11 @@ class EvaluationJob(Job):
     @staticmethod
     def create(config, dataset, parent_job=None, model=None):
         """Factory method to create an evaluation job """
-        from kge.job import EntityRankingJob, EntityPairRankingJob
+        from kge.job import EntityRankingJob, EntityPairRankingJob  # 在这里执行 import，有意思，应该能提升性能吧。
 
         # create the job
-        if config.get("eval.type") == "entity_ranking":
+        # 下面的 EntityRankingJob 和 EntityPairRankingJob 都继承自 EvaluationJob
+        if config.get("eval.type") == "entity_ranking":  # 配置里使用的是这个
             return EntityRankingJob(config, dataset, parent_job=parent_job, model=model)
         elif config.get("eval.type") == "entity_pair_ranking":
             return EntityPairRankingJob(

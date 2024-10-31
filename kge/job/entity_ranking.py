@@ -14,7 +14,7 @@ class EntityRankingJob(EvaluationJob):
     def __init__(self, config: Config, dataset: Dataset, parent_job, model):
         super().__init__(config, dataset, parent_job, model)
         self.config.check(
-            "eval.tie_handling",
+            "eval.tie_handling",  # tie 是指跟 target 具有相同的分数的 candidates，影响最终的 rank 取值。配置里使用的是 round mean
             ["rounded_mean_rank", "best_rank", "worst_rank"],
         )
         self.tie_handling = self.config.get("eval.tie_handling")
@@ -31,17 +31,26 @@ class EntityRankingJob(EvaluationJob):
             return
 
         # create data and precompute indexes
-        self.triples = self.dataset.split(self.config.get("eval.split"))
+        # 配置文件里的 eval.split 使用的是 valid
+        # 使用 np.load() 得到 shape = (n, 4) 的数据再使用 torch.from_numpy() 转化成 tensor
+        self.triples = self.dataset.split(self.config.get("eval.split"))  # todo 需要考虑下如何使用 test
+        # filter_splits 一般包含 train 和 valid，这里按 sp_to_o 和 po_to_s 分跟 TLogic 里设置逆关系的思路应该是一样的
         for split in self.filter_splits:
+            # dataset.index(key) 这个方法关键看 key 的值，比如 valid_sp_to_o 表示把 valid 数据，以 (s, p) 为键，而 [o1,o2...] 为值
+            # 的形式构建成一个 OrderList。初次调用会把组织结果缓存起来，方便后面使用。
             self.dataset.index(f"{split}_sp_to_o")
             self.dataset.index(f"{split}_po_to_s")
+
+        # 这个条件是为了防止 test 在 filter_splits 且 filter_with_test 为 True 重复加载 test 数据；而在 test 不在 filter_splits 里
+        # 但 filter_with_test 为 True 保证要加入 test 数据。
         if "test" not in self.filter_splits and self.filter_with_test:
             self.dataset.index("test_sp_to_o")
             self.dataset.index("test_po_to_s")
 
         # and data loader
+        #
         self.loader = torch.utils.data.DataLoader(
-            self.triples,
+            self.triples,  # 看起来只包含 eval.split 数据，默认是 valid 数据，这个是四元组
             collate_fn=self._collate,
             shuffle=False,
             batch_size=self.batch_size,
@@ -53,11 +62,11 @@ class EntityRankingJob(EvaluationJob):
         self.is_prepared = True
 
     def _collate(self, batch):
-        "Looks up true triples for each triple in the batch"
+        """Looks up true triples for each triple in the batch"""
         label_coords = []
         for split in self.filter_splits:
-            split_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(
-                batch,
+            split_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(  # 这个方法在 kge/job/util.py 里定义，无法直接跳转
+                batch,  # 四元组数据
                 self.dataset.num_entities(),
                 self.dataset.index(f"{split}_sp_to_o"),
                 self.dataset.index(f"{split}_po_to_s"),

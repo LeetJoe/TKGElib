@@ -76,16 +76,19 @@ class Dataset(Configurable):
         #: key. Index functions are expected to not recompute an index that is already
         #: present. Indexed by key (same key as in self._indexes)
         self.index_functions: Dict[str, Callable] = {}
-        create_default_index_functions(self)
+        create_default_index_functions(self)  # 在这里初始化 dataset 的 default index functions
 
     ## LOADING ##########################################################################
 
+    # 这个方法用来确认某个配置中的文件存在，否则会报错
     def ensure_available(self, key):
         """Checks if key can be loaded"""
         if self.folder is None or not os.path.exists(self.folder):
             raise IOError(
                 "Dataset {} not found".format(self.config.get("dataset.name"))
             )
+
+        # 从配置文件里读相应的数据文件的名字，比如 train.del, valid.del, test.del, entity_ids.del 等。
         filename = self.config.get(f"dataset.files.{key}.filename")
         if filename is None:
             raise IOError("Filename for key {} not specified in config".format(key))
@@ -197,6 +200,7 @@ class Dataset(Configurable):
             Dataset._pickle_dump_atomic(triples, pickle_filename)
         return triples
 
+    # 通过 key 获得相应配置指定的文件内容然后统一放在 self._triples 里，以 key 为键值存储，并返回结果
     def load_triples(self, key: str) -> Tensor:
         "Load or return the triples with the specified key."
         if key not in self._triples:
@@ -543,6 +547,7 @@ NOT RECOMMENDED: You can update the timestamp of all cached files using:
         """Return metadata stored under the specified key."""
         return self._meta[key]
 
+    # 这里的 index 是 dataset 里的一个专有名称，是指由 dataset 对象生成的各种数据
     def index(self, key: str) -> Any:
         """Return the index stored under the specified key.
 

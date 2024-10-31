@@ -37,6 +37,8 @@ def _save_job_config(job: "Job"):
 class Job:
     # Hooks run after job creation has finished
     # signature: job
+
+    # 这个在各类 train jobs 和 evaluation job 里都会使用
     job_created_hooks: List[Callable[["Job"], Any]] = [
         _trace_job_creation,
         _save_job_config,

@@ -326,6 +326,8 @@ eval:
 
   # Splits used to filter for filtered metrics. The split using for evaluation
   # (as set above) will be added automatically if not present.
+  # todo 如果没有理解错的话，这里的 filter_splits 就是用来执行 rank filter 的集合，按照上面的注释，如果前面的 split 不在这个列表里，
+  # todo 会自动加进去，也就是说如果取 split = test，test 会自动加到下面的列表中。
   filter_splits: [ 'train', 'valid' ]
 
   # Whether test data should be used for filtering even if the current filter
@@ -335,6 +337,10 @@ eval:
   # existing models have been trained with this set to True during model
   # selection and using a metric such as
   # mean_reciprocal_rank_filtered_with_test.
+  # todo 由于 ECEformer 没有对数据做排序，所以基于 train 数据的训练得到的模型在对 test 数据进行预测的时候，预测结果可能会存在于 train/valid/test
+  # todo 任意一个 split 中，而不像 TLogic 那样因为 ts 做了排序所以预测结果仅可能存在于 test 数据中。所以 TLogic 只需要在 test 里做 filter,
+  # todo 而 ECEformer 还需要考虑 train/valid。再根据上面注释的说法，多数模型都会在 filter 的时候考虑 test，所以这里设置为 True，这样就跟
+  # todo TLogic 是一致的。在 evaluation 阶段生成的各种指标里，默认是 filter 的时候不带 test，带 test 的指标会在后面加个 _with_test 后缀。
   filter_with_test: True
 
   # Type of evaluation (entity_ranking only at the moment)
