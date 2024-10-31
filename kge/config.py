@@ -469,6 +469,7 @@ class Config:
         config.set_all(more_options, create=True)
         return config
 
+    # 生成一个 checkpoint 文件名，带完整的路径
     def checkpoint_file(self, cpt_id: Union[str, int]) -> str:
         "Return path of checkpoint file for given checkpoint id"
         from kge.misc import is_number

@@ -142,14 +142,23 @@ class TrainingJob(Job):
     # TrainingJob 的其它子类并没有再重载这个方法，都是走的这个方法。
     def run(self) -> None:
         """Start/resume the training job and run to completion."""
+        # 每当 start 或者 resume，job 启动之后，这里只会进入一次 —— 也就是说，并行部分并未包括这里，在再深的层次中
         self.config.log("Starting training...")
+        # 这个控制至少每多少轮保存一次 checkpoint，目的是防止经过很多 epochs 后没有找到 better 便不会触发 save best，一旦任务中止这段训练便白费了
         checkpoint_every = self.config.get("train.checkpoint.every")
+        # 由于 every 机制的存在，避免保存过多的 checkpoint 占用空间，只保留最近的 keep 个 checkpoint，再早的就删除。
         checkpoint_keep = self.config.get("train.checkpoint.keep")
+        # 这个实际上是评价指标的名称，这里是 “mean_reciprocal_rank_filtered_with_test”，在 log 里能看到，每次 valid 都会有一堆。
+        # 这个指标也是系统在不同的 epoch 之间选择哪次训练结果更好的标准。
         metric_name = self.config.get("valid.metric")
+        # 这个很直观，用来控制多少轮后没有 better 的结果的话，就触发 early stop
         patience = self.config.get("valid.early_stopping.patience")
         while True:
             # checking for model improvement according to metric_name
             # and do early stopping and keep the best checkpoint
+            # 有效训练的 epoch 是从 1 开始计数的，刚来到这里时会做一些上一轮训练的后处理，此时 epoch 还没有 +1, +1 的操作见下方。
+
+            # 如果上一轮训练后执行了 valid，检查是否有必要将训练结果保存为 checkpoint
             if (
                 len(self.valid_trace) > 0
                 and self.valid_trace[-1]["epoch"] == self.epoch
@@ -158,8 +167,12 @@ class TrainingJob(Job):
                     range(len(self.valid_trace)),
                     key=lambda index: self.valid_trace[index][metric_name],
                 )
+
+                # len(self.valid_trace) 是已经完成的 valid 次数，len(self.valid_trace) - 1 就是上一次 valid 记录的下标（从 0 开始计）。
                 if best_index == len(self.valid_trace) - 1:
                     self.save(self.config.checkpoint_file("best"))
+
+                # 距离上次 best 已经又过去了 patience 轮训练且没有产生新的 best：终止
                 if (
                     patience > 0
                     and len(self.valid_trace) > patience
@@ -172,6 +185,9 @@ class TrainingJob(Job):
                         + "in the last {} validation runs).".format(patience)
                     )
                     break
+
+                # 这一段的含义是，如果已经执行了设置的允许 early stop 的最小训练轮次，而且训练结果没能达到设定的最底训练效果的要求，
+                # 就终止训练，表示参数的设置有问题，经过“足够”多的步骤连最低的训练结果也没达到，没必要再继续了。
                 if self.epoch > self.config.get(
                     "valid.early_stopping.min_threshold.epochs"
                 ) and self.valid_trace[best_index][metric_name] < self.config.get(
@@ -184,46 +200,57 @@ class TrainingJob(Job):
                     )
                     break
 
-            # should we stop?
+            # should we stop? 这里是当达到了最大的 epoch 时退出。
+            # self.epoch 始终等于实际已经执行的训练次数，最初进入的时候应该有 self.epoch == 0
             if self.epoch >= self.config.get("train.max_epochs"):
                 self.config.log("Maximum number of epochs reached.")
                 break
 
-            # start a new epoch
+            # start a new epoch, 这里 epoch + 1，才真正进入了新的 epoch
             self.epoch += 1
             self.config.log("Starting epoch {}...".format(self.epoch))
-            trace_entry = self.run_epoch()
-            for f in self.post_epoch_hooks:
+            # 这个 trace_entry 是训练的一些 log 信息，也就是 trace 本来的字面含义
+            trace_entry = self.run_epoch()   # 这里就是训练入口，返回就训练完成了。 好简洁！！
+            for f in self.post_epoch_hooks:  # todo 这个好像是空的，没看到有重载或者赋值的代码。
                 f(self, trace_entry)
             self.config.log("Finished epoch {}.".format(self.epoch))
 
             # update model metadata
-            self.model.meta["train_job_trace_entry"] = self.trace_entry
+            # 这些 meta 信息会通过 KgeModel.save() 方法作为 self.meta 返回
+            self.model.meta["train_job_trace_entry"] = self.trace_entry # todo 这个 self.trace_entry 跟训练得到的 trace_entry 有什么区别？好像是空的。
             self.model.meta["train_epoch"] = self.epoch
             self.model.meta["train_config"] = self.config
             self.model.meta["train_trace_entry"] = trace_entry
 
-            # validate and update learning rate
+            # validate and update learning rate, 如果进行 valid
             if (
                 self.config.get("valid.every") > 0
                 and self.epoch % self.config.get("valid.every") == 0
             ):
+                # valid 任务通过 self.valid_job 来组织实现
                 self.valid_job.epoch = self.epoch
                 trace_entry = self.valid_job.run()
-                self.valid_trace.append(trace_entry)
+                self.valid_trace.append(trace_entry)  #
                 for f in self.post_valid_hooks:
                     f(self, trace_entry)
                 self.model.meta["valid_trace_entry"] = trace_entry
 
                 # metric-based scheduler step
+                # 如果执行了 valid，要根据 valid 结果调整 lr
                 self.kge_lr_scheduler.step(trace_entry[metric_name])
             else:
+                # 如果没有执行 valid，执行例行调整，step() 方法没有参数，注意与上面分支的区别
                 self.kge_lr_scheduler.step()
 
             # create checkpoint and delete old one, if necessary
+            # 每个 epoch 都会保存 checkpoint，参数里的 self.epoch 应该是 checkpoint 文件的后缀。
+            # 前面 while 循环开始处只处理执行了 valid 的 checkpoint，后缀使用的是 best。
             self.save(self.config.checkpoint_file(self.epoch))
             if self.epoch > 1:
                 delete_checkpoint_epoch = -1
+                # 设置删除 checkpoint 的后缀，也就是 epoch 编号，大于 0 时有效，一次最多只删除一个。策略是：
+                # 1. 如果 checkpoint_every 是 0 或者前一轮不在 checkpoint_every 周期节点上，删除前一个 checkpoint；
+                # 2. 如果保存的 checkpoint 的数量（不包括 best）超过 checkpoint_keep，删除最早一个 checkpoint；
                 if checkpoint_every == 0:
                     # do not keep any old checkpoints
                     delete_checkpoint_epoch = self.epoch - 1
@@ -235,6 +262,8 @@ class TrainingJob(Job):
                     delete_checkpoint_epoch = (
                         self.epoch - 1 - checkpoint_every * checkpoint_keep
                     )
+
+                # 如果是个有效的 delete_epoch
                 if delete_checkpoint_epoch > 0:
                     if os.path.exists(
                         self.config.checkpoint_file(delete_checkpoint_epoch)
@@ -246,36 +275,39 @@ class TrainingJob(Job):
                         )
                         os.remove(self.config.checkpoint_file(delete_checkpoint_epoch))
                     else:
+                        # 有可能是异常也有可能是被手动删除了，记录一下
                         self.config.log(
                             "Could not delete old checkpoint {}, does not exits.".format(
                                 self.config.checkpoint_file(delete_checkpoint_epoch)
                             )
                         )
 
-        for f in self.post_train_hooks:
+        # while true 循环已结束
+        for f in self.post_train_hooks:  # todo 这个好像也是空的？跟前面的那个 post_epoch_hooks 一样没看到有重载或者赋值的代码。难道是都在 post_job_hooks 里做的？
             f(self, trace_entry)
         self.trace(event="train_completed")
 
     def save(self, filename) -> None:
         """Save current state to specified file"""
         self.config.log("Saving checkpoint to {}...".format(filename))
-        checkpoint = self.save_to({})
-        torch.save(
+        checkpoint = self.save_to({})  # 这个 save_to() 只是组织返回 checkpoint 信息，没有实际的保存动作
+        torch.save(  # 所以最终的 save 动作是调用的 torch 自己的方法
             checkpoint, filename,
         )
-        
+
+    # 打包 checkpoint 信息
     def save_to(self, checkpoint: Dict) -> Dict:
         """Adds trainjob specific information to the checkpoint"""
         train_checkpoint = {
             "type": "train",
             "epoch": self.epoch,
             "valid_trace": self.valid_trace,
-            "model": self.model.save(),
+            "model": self.model.save(),  # 这个使用的是 KgeModel 里的 save，eceformer 没有重载，返回的是模型参数
             "optimizer_state_dict": self.optimizer.state_dict(),
-            "lr_scheduler_state_dict": self.kge_lr_scheduler.state_dict(),
+            "lr_scheduler_state_dict": self.kge_lr_scheduler.state_dict(),  # todo 这个 lr_scheduler 是个什么东西？
             "job_id": self.job_id,
         }
-        train_checkpoint = self.config.save_to(train_checkpoint)
+        train_checkpoint = self.config.save_to(train_checkpoint)  # 这个就是把 config 自己加到 train_checkpoint 中
         checkpoint.update(train_checkpoint)
         return checkpoint
 
