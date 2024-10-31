@@ -18,7 +18,7 @@ def get_sp_po_coords_from_spo_batch(
     """
     num_ones = 0
 
-    # todo 这里面怎么只有 s, p, o，没有 ts？稍后再看这里
+    # todo 这里面怎么只有 s, p, o，没有 ts？
     NOTHING = torch.zeros([0], dtype=torch.long)
     for i, triple in enumerate(batch):  # batch 就是一组切段数据，这里是应该是四元组
         s, p, o = triple[0].item(), triple[1].item(), triple[2].item()
@@ -38,6 +38,7 @@ def get_sp_po_coords_from_spo_batch(
         coords[current_index : (current_index + len(objects)), 1] = objects
         current_index += len(objects)
 
+        # 这里加上了 num_entities，应该是用来跟前面的 objects 进行区分。在 item[0] == i 的时候，item[1] < num_entities 就是 object，反之就是 subject
         subjects = po_index.get((p, o), NOTHING) + num_entities
         coords[current_index : (current_index + len(subjects)), 0] = i
         coords[current_index : (current_index + len(subjects)), 1] = subjects

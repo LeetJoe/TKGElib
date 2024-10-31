@@ -48,21 +48,28 @@ class EntityRankingJob(EvaluationJob):
             self.dataset.index("test_po_to_s")
 
         # and data loader
-        #
+        # DataLoader 输入的第一个参数是 Dataset 类型的数据，但是这里使用的 self.triples 其实就是一个 tensor 类型的变量；
+        # 而且 collate_fn 里使用的 batch 也并非是这个 tensor 的一段，需要进一步研究下。
         self.loader = torch.utils.data.DataLoader(
             self.triples,  # 看起来只包含 eval.split 数据，默认是 valid 数据，这个是四元组
             collate_fn=self._collate,
             shuffle=False,
             batch_size=self.batch_size,
-            num_workers=self.config.get("eval.num_workers"),
-            pin_memory=self.config.get("eval.pin_memory"),
+            # 这个 num_workers 表示用来拆分 batch 的进程数量，配置文件里使用的是 0，表示不使用子进程。
+            num_workers=self.config.get("eval.num_workers"),  # todo 如果 > 0 会是什么效果？进程安全吗？
+            pin_memory=self.config.get("eval.pin_memory"),  # 配置文件里使用的是 False，不是 True 性能会更好吗？会有什么问题？
         )
         # let the model add some hooks, if it wants to do so
         self.model.prepare_job(self)
         self.is_prepared = True
 
     def _collate(self, batch):
+
+        # todo !!!!! 这里注意 batch 格式，DataLoader 里输入的 dataset 是 shape=[n, 4] 的一个 tensor，但是 batch 并不是一个 shape
+        # todo =[b, 4] 的 tensor, 而是一个长度为 b 的 tuple，其中每一项是一个 shape=[4] 的 tensor
+
         """Looks up true triples for each triple in the batch"""
+        # 从注释来看，这个 label_coords 的目的是为了找到在那些跟 batch 的 sp 或 po 相同的 facts，寻找范围依 filter 参数来确定。
         label_coords = []
         for split in self.filter_splits:
             split_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(  # 这个方法在 kge/job/util.py 里定义，无法直接跳转
@@ -84,6 +91,8 @@ class EntityRankingJob(EvaluationJob):
         else:
             test_label_coords = torch.zeros([0, 3], dtype=torch.long)
 
+        # batch 原来是由 batch_size 个 shape=[4] 的 tensor 组成，使用 cat() 后变成一个 shape=[batch_size * 4] 的 tensor；
+        # 再使用 reshape((-1, 4)) 的作用是将转换成一个 shape=[batch_size, 4] 的 tensor，注意新旧 batch 的差别。
         batch = torch.cat(batch).reshape((-1, 4))
         return batch, label_coords, test_label_coords
 
