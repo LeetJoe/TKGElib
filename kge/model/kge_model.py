@@ -460,14 +460,16 @@ class KgeModel(KgeBase):
         return model
 
     def prepare_job(self, job: "Job", **kwargs):
-        super().prepare_job(job, **kwargs)
+        super().prepare_job(job, **kwargs)  # 超类里的 prepare_job 是空的，下面这几个 embedder 都实例化自同一个类 KgeEmbedder，它们的 prepare_job 看起来都是空的。
         self._entity_embedder.prepare_job(job, **kwargs)
         self._relation_embedder.prepare_job(job, **kwargs)
         self._time_embedder.prepare_job(job, **kwargs)
 
         def append_num_parameter(job, trace):
+            # p.numel() 用于计算 tensor p 的参数量，比如它是一个 [2,3,4] 的矩阵，那么 p.numel() = 2*3*4 = 24
             trace["num_parameters"] = sum(map(lambda p: p.numel(), self.parameters()))
 
+        # 这个就是添加了一个 trace 的记录点，看起来并不重要。
         job.post_epoch_trace_hooks.append(append_num_parameter)
 
     def penalty(self, **kwargs) -> List[Tensor]:
