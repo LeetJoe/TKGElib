@@ -96,12 +96,12 @@ class EntityRankingJob(EvaluationJob):
         batch = torch.cat(batch).reshape((-1, 4))
         return batch, label_coords, test_label_coords
 
-    @torch.no_grad()
+    @torch.no_grad()  # todo 注意这里有个 no_grad()
     def run(self) -> dict:
         self._prepare()
 
-        was_training = self.model.training
-        self.model.eval()
+        was_training = self.model.training  # 这个是状态参数？
+        self.model.eval()  # 这个是模块里提供的方法 todo 这个 model 在哪里实例化的，没找到？
         self.config.log(
             "Evaluating on "
             + self.eval_split
@@ -109,7 +109,7 @@ class EntityRankingJob(EvaluationJob):
         )
         num_entities = self.dataset.num_entities()
 
-        # we also filter with test data if requested
+        # we also filter with test data if requested，这里即使是对 valid 数据进行评估，也可以指定对 test 也进行 filter
         filter_with_test = "test" not in self.filter_splits and self.filter_with_test
 
         # which rankings to compute (DO NOT REORDER; code assumes the order given here)
@@ -119,6 +119,7 @@ class EntityRankingJob(EvaluationJob):
 
         # dictionary that maps entry of rankings to a sparse tensor containing the
         # true labels for this option
+        # 初始化，以面按前面的 rankings 为键值组织对应的数据
         labels_for_ranking = defaultdict(lambda: None)
 
         # Initiliaze dictionaries that hold the overall histogram of ranks of true
@@ -134,18 +135,26 @@ class EntityRankingJob(EvaluationJob):
             # construct a sparse label tensor of shape batch_size x 2*num_entities
             # entries are either 0 (false) or infinity (true)
             # TODO add timing information
-            batch = batch_coords[0].to(self.device)
-            s, p, o, t = batch[:, 0], batch[:, 1], batch[:, 2], batch[:, 3]
+            # todo 从 _collate() 函数的实现来看，这里的 batch_coords 包括三部分：batch, label_coords 和 test_label_coords
+            batch = batch_coords[0].to(self.device)  # [0] 就是 batch 本身
+            s, p, o, t = batch[:, 0], batch[:, 1], batch[:, 2], batch[:, 3]  # 这里终于有 t 了
             label_coords = batch_coords[1].to(self.device)
             if filter_with_test:
                 test_label_coords = batch_coords[2].to(self.device)
                 # create sparse labels tensor
+                # 这个 coord_to_sparse_tensor 就是用来构建一个稀疏矩阵，里面用的是 torch.sparse.Tensor() 方法
+                # test_label_coords 的 shape=[2, num_ones]，其中 num_ones 大小不确定，具体见 get_sp_po_coords_from_spo_batch；
+                # test_label_coords 的第一行是 batch 的下标，范围 [0, batch_size - 1], 第二行是 entity id, 由于 _po 模式对
+                # subject id 作了 +num_entities 操作，使其范围变成 [0, 2*num_entities-1]。
+                # coord_to_sparse_tensor 第一个参数是稀疏矩阵的行数，大小是 len(batch)，第二个参数是稀疏矩阵的列数，大小是 2*num_entities，
+                # 第三个参数 test_label_coords 传入后会被执行转置操作，变成了 num_ones 个二元组，结合其取值范围，刚好在稀疏矩阵的尺寸
+                # 范围内，这样的二元组指定坐标处的值置为 Inf，其它位置为 0，从而构建了一个稀疏矩阵。
                 test_labels = kge.job.util.coord_to_sparse_tensor(
-                    len(batch),
-                    2 * num_entities,
+                    len(batch),  # nrows
+                    2 * num_entities,  # ncols
                     test_label_coords,
                     self.device,
-                    float("Inf"),
+                    float("Inf"),  # 非 0 默认值，默认是 1，乘以这个 value 参数
                 )
                 labels_for_ranking["_filt_test"] = test_labels
 
@@ -156,12 +165,13 @@ class EntityRankingJob(EvaluationJob):
             labels_for_ranking["_filt"] = labels
 
             # compute true scores beforehand, since we can't get them from a chunked
-            # score table
+            # score table, 最后一个 "o"/"s" 表示 direction
             o_true_scores = self.model("score_spo", s, p, o, t, "o").view(-1)
             s_true_scores = self.model("score_spo", s, p, o, t, "s").view(-1)
 
             # default dictionary storing rank and num_ties for each key in rankings
             # as list of len 2: [rank, num_ties]
+            # todo 这个 defaultdict() 的第一个参数影响的是出现重复的 key 或者取 key 的时候不存在时的行为，这里的使用方法有点看不太懂
             ranks_and_ties_for_ranking = defaultdict(
                 lambda: [
                     torch.zeros(s.size(0), dtype=torch.long).to(self.device),
@@ -171,12 +181,14 @@ class EntityRankingJob(EvaluationJob):
 
             # calculate scores in chunks to not have the complete score matrix in memory
             # a chunk here represents a range of entity_values to score against
-            if self.config.get("eval.chunk_size") > -1:
+            if self.config.get("eval.chunk_size") > -1:  # 配置文件里默认就是 -1
                 chunk_size = self.config.get("eval.chunk_size")
             else:
                 chunk_size = self.dataset.num_entities()
 
             # process chunk by chunk
+            # 这里 chunk 并不是对 batch 进行进一步的分批，而是在进行 _po/sp_ 预测的时候，对目标所属的 entities 集合进行
+            # chunk，避免 entities 过多单批推理负载过重，限定候选范围多次推理，用时间换空间。
             for chunk_number in range(math.ceil(num_entities / chunk_size)):
                 chunk_start = chunk_size * chunk_number
                 chunk_end = min(chunk_size * (chunk_number + 1), num_entities)
@@ -188,20 +200,30 @@ class EntityRankingJob(EvaluationJob):
                     scores = self.model("score_sp_po",
                         s, p, o, t, torch.arange(chunk_start, chunk_end).to(self.device)
                     )
+
+                # 结果平均分两段，前半段是 sp 的结果，后半段是 po 的结果。
                 scores_sp = scores[:, : chunk_end - chunk_start]
                 scores_po = scores[:, chunk_end - chunk_start :]
 
                 # replace the precomputed true_scores with the ones occurring in the
                 # scores matrix to avoid floating point issues
+                # 前面这两句用来选择出 s, o 中满足 chunk 范围的 mask
                 s_in_chunk_mask = (chunk_start <= s) & (s < chunk_end)
                 o_in_chunk_mask = (chunk_start <= o) & (o < chunk_end)
+                # 这两句应该是要实现 scores_sp/po 里的下标与 id 的转换：scores_sp/po 里的 target 是 entities(子集) 的下标，
+                # 但存储的时候仍然是从 0 开始计，与 entities 的实际下标有 chunk_start 的偏移，用 id - chunk_start 得到的就是
+                # 对应实体 id 在 scores_sp/po 的实际下标位置。
                 o_in_chunk = (o[o_in_chunk_mask] - chunk_start).long()
                 s_in_chunk = (s[s_in_chunk_mask] - chunk_start).long()
+                # 这里的操作是把经过 score_sp() 预测的结果 (s, p, ?, t) 里 ? 存在于 facts 中的 (s, p, o, t) 的预测结果，用
+                # score_spo() 方法预测的结果进行替换，理论上两者应该是相等的，这里替换的目的说是“避免 floating issues，猜测是避
+                # 免因为小数点极小的差异导致的分数浮动，统一使用 score_spo() 的结果保持分数全局来源一致。
                 scores_sp[o_in_chunk_mask, o_in_chunk] = o_true_scores[o_in_chunk_mask]
                 scores_po[s_in_chunk_mask, s_in_chunk] = s_true_scores[s_in_chunk_mask]
 
                 # now compute the rankings (assumes order: None, _filt, _filt_test)
                 for ranking in rankings:
+                    # ranking 是 _raw 的时候，对应的 labels 是 None
                     if labels_for_ranking[ranking] is None:
                         labels_chunk = None
                     else:
@@ -211,6 +233,7 @@ class EntityRankingJob(EvaluationJob):
                         )
 
                         # remove current example from labels
+                        # 将 query 的 target 从 labels 里删除，target 的 score 从 x_true_scores 里取
                         labels_chunk[o_in_chunk_mask, o_in_chunk] = 0
                         labels_chunk[
                             s_in_chunk_mask, s_in_chunk + (chunk_end - chunk_start)
@@ -233,7 +256,7 @@ class EntityRankingJob(EvaluationJob):
                     scores_sp = scores_sp_filt
                     scores_po = scores_po_filt
 
-                    # update rankings
+                    # update rankings，这里的 += 就是 cat()
                     ranks_and_ties_for_ranking["s" + ranking][0] += s_rank_chunk
                     ranks_and_ties_for_ranking["s" + ranking][1] += s_num_ties_chunk
                     ranks_and_ties_for_ranking["o" + ranking][0] += o_rank_chunk
@@ -242,6 +265,7 @@ class EntityRankingJob(EvaluationJob):
                 # we are done with the chunk
 
             # We are done with all chunks; calculate final ranks from counts
+            # _get_ranks() 就是对 rank 和 ties 应用 best/worst/mean 策略
             s_ranks = self._get_ranks(
                 ranks_and_ties_for_ranking["s_raw"][0],
                 ranks_and_ties_for_ranking["s_raw"][1],
@@ -259,7 +283,7 @@ class EntityRankingJob(EvaluationJob):
                 ranks_and_ties_for_ranking["o_filt"][1],
             )
 
-            # Update the histograms of of raw ranks and filtered ranks
+            # Update the histograms of raw ranks and filtered ranks
             batch_hists = dict()
             batch_hists_filt = dict()
             for f in self.hist_hooks:
@@ -450,6 +474,7 @@ class EntityRankingJob(EvaluationJob):
 
         return trace_entry
 
+    # 从稀疏矩阵 labels 里截取一块子矩阵，重新组织成稀疏矩阵形式返回
     def _densify_chunk_of_labels(
         self, labels: torch.Tensor, chunk_start: int, chunk_end: int
     ) -> torch.Tensor:
@@ -472,6 +497,7 @@ class EntityRankingJob(EvaluationJob):
 
         """
         num_entities = self.dataset.num_entities()
+        # _indices() 用于 sparse coo 矩阵，返回稀疏矩阵所有非零元素的坐标对 (x, y), x 实际上是 batch index, y 是 entities index。
         indices = labels._indices()
         mask_sp = (chunk_start <= indices[1, :]) & (indices[1, :] < chunk_end)
         mask_po = ((chunk_start + num_entities) <= indices[1, :]) & (
@@ -549,6 +575,9 @@ num_ties for each true score.
 
         # Determine how many scores are greater than / equal to each true answer (in its
         # corresponding row of scores)
+        # rank 是 batch_size x best rank 的 矩阵。
+        # todo: true_scores 的 shape 应该和 true_scores.view(-1, 1) 的 shape 是一样的，多余加这一步是为什么？
+        # 经测试如果确定 true_score 是 nx1 的 tensor，不执行 view(-1, 1) 结果也是一样的，这里可能是为了防止一些意外。
         rank = torch.sum(scores > true_scores.view(-1, 1), dim=1, dtype=torch.long)
         num_ties = torch.sum(scores == true_scores.view(-1, 1), dim=1, dtype=torch.long)
         return rank, num_ties

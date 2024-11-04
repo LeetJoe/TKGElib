@@ -18,7 +18,7 @@ def get_sp_po_coords_from_spo_batch(
     """
     num_ones = 0
 
-    # todo 这里面怎么只有 s, p, o，没有 ts？
+    # todo 这里面怎么只有 s, p, o，没有 t？
     NOTHING = torch.zeros([0], dtype=torch.long)
     for i, triple in enumerate(batch):  # batch 就是一组切段数据，这里是应该是四元组
         s, p, o = triple[0].item(), triple[1].item(), triple[2].item()
@@ -55,8 +55,9 @@ def coord_to_sparse_tensor(
     nrows: int, ncols: int, coords: Tensor, device: str, value=1.0
 ):
     if device == "cpu":
+        # torch.sparse.FloatTensor 第一个参数表示坐标，第二个参数表示数据
         labels = torch.sparse.FloatTensor(
-            coords.long().t(),
+            coords.long().t(),  # 这个参数的长度（列数）可变，重要的是每一行的两个值的取值范围要在 nrows 和 ncols 的范围内
             torch.ones([len(coords)], dtype=torch.float, device=device) * value,
             torch.Size([nrows, ncols]),
         )
