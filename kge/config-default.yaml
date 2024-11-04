@@ -377,6 +377,7 @@ eval:
 
   # Metrics are always computed over the entire evaluation data. Optionally,
   # certain more specific metrics can be computed in addition.
+  # todo: 这里控制了输出指标的类型，也就是在 log 里能看到的各种指标的分类。
   metrics_per:
     head_and_tail: False          # head, tail; also applied to relation_type below
     relation_type: False          # 1-to-1, 1-to-N, N-to-1, N-to-N

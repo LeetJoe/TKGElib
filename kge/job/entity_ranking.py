@@ -266,6 +266,7 @@ class EntityRankingJob(EvaluationJob):
 
             # We are done with all chunks; calculate final ranks from counts
             # _get_ranks() 就是对 rank 和 ties 应用 best/worst/mean 策略
+            # 这些 x_ranks 中的 rank 都是从 0 开始计数的。
             s_ranks = self._get_ranks(
                 ranks_and_ties_for_ranking["s_raw"][0],
                 ranks_and_ties_for_ranking["s_raw"][1],
@@ -286,7 +287,7 @@ class EntityRankingJob(EvaluationJob):
             # Update the histograms of raw ranks and filtered ranks
             batch_hists = dict()
             batch_hists_filt = dict()
-            for f in self.hist_hooks:
+            for f in self.hist_hooks:  # 结果直接应用在 batch_hists 和 batch_hists_filt 里，没有返回
                 f(batch_hists, s, p, o, s_ranks, o_ranks, job=self)
                 f(batch_hists_filt, s, p, o, s_ranks_filt, o_ranks_filt, job=self)
 
@@ -313,6 +314,9 @@ class EntityRankingJob(EvaluationJob):
                     )
 
             # optionally: trace ranks of each example
+            # 这个设置为 true 之后，所有的 query 的相关信息都会 trace 出来，在 eval job 里会执行，输出在 trace.yaml 文件里
+            # 输出有 s, p, o, t, task(sp, po), split(test), filter([train,valid,test]),rank, rank_filtered
+            # todo: 还缺个 score
             if self.trace_examples:
                 entry = {
                     "type": "entity_ranking",
@@ -325,7 +329,7 @@ class EntityRankingJob(EvaluationJob):
                 }
                 for i in range(len(batch)):
                     entry["batch"] = i
-                    entry["s"], entry["p"], entry["o"], entry["t"]= (
+                    entry["s"], entry["p"], entry["o"], entry["t"] = (
                         s[i].item(),
                         p[i].item(),
                         o[i].item(),
@@ -355,6 +359,9 @@ class EntityRankingJob(EvaluationJob):
                     )
 
             # Compute the batch metrics for the full histogram (key "all")
+            # batch_hists["all"].shape = [num_entities, ]，其中存放的是相应 rank 的计数，
+            # 如 [1, 2, 3] 表示 rank=1 的有 1 个，rank=2 的有 2 个，rank=3 的有 3 个。rank = index + 1
+            # 这里的 metrics 仅仅是 batch metrics，用于输出的，并不会用来进行 global 合并，global 合并的是 ranks 信息
             metrics = self._compute_metrics(batch_hists["all"])
             metrics.update(
                 self._compute_metrics(batch_hists_filt["all"], suffix="_filtered")
@@ -367,7 +374,7 @@ class EntityRankingJob(EvaluationJob):
                 )
 
             # optionally: trace batch metrics
-            if self.trace_batch:
+            if self.trace_batch:  # 这里在配置文件里是 true —— 如果 trace level 是 example，这个就是 true。
                 self.trace(
                     event="batch_completed",
                     type="entity_ranking",
@@ -382,6 +389,7 @@ class EntityRankingJob(EvaluationJob):
                 )
 
             # output batch information to console
+            # batch metrics 输出到日志， 只输出 hits_at_1 和 hits_at_10 ？ 算了，不重要
             self.config.print(
                 (
                     "\r"  # go back
@@ -415,6 +423,7 @@ class EntityRankingJob(EvaluationJob):
                     else:
                         target_hists[key] = hist
 
+            # 合并 batch hist 到 global hist
             merge_hist(hists, batch_hists)
             merge_hist(hists_filt, batch_hists_filt)
             if filter_with_test:
@@ -424,6 +433,8 @@ class EntityRankingJob(EvaluationJob):
         self.config.print("\033[2K\r", end="", flush=True)  # clear line and go back
         for key, hist in hists.items():
             name = "_" + key if key != "all" else ""
+            # todo: 这里竟然使用 update()? metric 在前面的循环里使用过而且没有清空，直接这么用没问题吗？
+            #  还是说因为 global 必然会覆盖 metrics 里的所有内容所以不需要清理？
             metrics.update(self._compute_metrics(hists[key], suffix=name))
             metrics.update(
                 self._compute_metrics(hists_filt[key], suffix="_filtered" + name)
@@ -449,12 +460,14 @@ class EntityRankingJob(EvaluationJob):
             event="eval_completed",
             **metrics,
         )
-        for f in self.post_epoch_trace_hooks:
+        for f in self.post_epoch_trace_hooks:  # todo: 这个好像是空的
             f(self, trace_entry)
 
         # if validation metric is not present, try to compute it
         metric_name = self.config.get("valid.metric")
         if metric_name not in trace_entry:
+            # 这里的 metric_expr 用于指定在 valid metric(就是用于在 epoch 间比较优劣的标准) 未找到时进行计算，
+            # 这里的配置文件没给这个表达式，也就是说要保证这个 metric 一定在 trace_entry 里。
             trace_entry[metric_name] = eval(
                 self.config.get("valid.metric_expr"),
                 None,
@@ -466,10 +479,10 @@ class EntityRankingJob(EvaluationJob):
 
         # reset model and return metrics
         if was_training:
-            self.model.train()
+            self.model.train()  # todo: 这个操作是 reset model？？
         self.config.log("Finished evaluating on " + self.eval_split + " split.")
 
-        for f in self.post_valid_hooks:
+        for f in self.post_valid_hooks:  # todo: 这个似乎也是空的
             f(self, trace_entry)
 
         return trace_entry
@@ -576,10 +589,10 @@ num_ties for each true score.
         # Determine how many scores are greater than / equal to each true answer (in its
         # corresponding row of scores)
         # rank 是 batch_size x best rank 的 矩阵。
-        # todo: true_scores 的 shape 应该和 true_scores.view(-1, 1) 的 shape 是一样的，多余加这一步是为什么？
         # 经测试如果确定 true_score 是 nx1 的 tensor，不执行 view(-1, 1) 结果也是一样的，这里可能是为了防止一些意外。
         rank = torch.sum(scores > true_scores.view(-1, 1), dim=1, dtype=torch.long)
         num_ties = torch.sum(scores == true_scores.view(-1, 1), dim=1, dtype=torch.long)
+        # rank 是从 0 开始计数的
         return rank, num_ties
 
     def _get_ranks(self, rank: torch.Tensor, num_ties: torch.Tensor) -> torch.Tensor:
@@ -607,10 +620,13 @@ num_ties for each true score.
     def _compute_metrics(self, rank_hist, suffix=""):
         """Computes desired matrix from rank histogram"""
         metrics = {}
-        n = torch.sum(rank_hist).item()
+        n = torch.sum(rank_hist).item()  # n 是 rank_dist 中所有元素和，todo 应该等于 query_num?
 
+        # torch.arange(1, 11) 生成一个 shape=[10,] 从 1 到 10 的 tensor
         ranks = torch.arange(1, self.dataset.num_entities() + 1).float().to(self.device)
         metrics["mean_rank" + suffix] = (
+            # rank_hist 是所有 rank 的计数，rank_hist[0] 的值是 rank=1 的计数；rank_hist * ranks 就是所有 sum(ranks（此处的 ranks 从 1 计）)，
+            # sum() 后再 /n 刚好就是 MR。
             (torch.sum(rank_hist * ranks).item() / n) if n > 0.0 else 0.0
         )
 
@@ -620,6 +636,7 @@ num_ties for each true score.
         )
 
         hits_at_k = (
+            # a = torch.cumsum(b, dim=0) 是对 list b 进行累加，a[0] 是 sum(b[:1]), a[1] 是 sum(b[:2]), a[n] = sum(b[:n+1])
             (torch.cumsum(rank_hist[: max(self.hits_at_k_s)], dim=0) / n).tolist()
             if n > 0.0
             else [0.0] * max(self.hits_at_k_s)
