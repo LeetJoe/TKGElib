@@ -40,12 +40,16 @@ class EntityRankingJob(EvaluationJob):
             # 的形式构建成一个 OrderList。初次调用会把组织结果缓存起来，方便后面使用。
             self.dataset.index(f"{split}_sp_to_o")
             self.dataset.index(f"{split}_po_to_s")
+            self.dataset.index(f"{split}_spt_to_o")  # todo indexing modified
+            self.dataset.index(f"{split}_pot_to_s")  # todo indexing modified
 
         # 这个条件是为了防止 test 在 filter_splits 且 filter_with_test 为 True 重复加载 test 数据；而在 test 不在 filter_splits 里
         # 但 filter_with_test 为 True 保证要加入 test 数据。
         if "test" not in self.filter_splits and self.filter_with_test:
             self.dataset.index("test_sp_to_o")
             self.dataset.index("test_po_to_s")
+            self.dataset.index("test_spt_to_o")  # todo indexing modified
+            self.dataset.index("test_pot_to_s")  # todo indexing modified
 
         # and data loader
         # DataLoader 输入的第一个参数是 Dataset 类型的数据，但是这里使用的 self.triples 其实就是一个 tensor 类型的变量；
