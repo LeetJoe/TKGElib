@@ -65,7 +65,7 @@ class Job:
         config: Config, dataset: Optional[Dataset] = None, parent_job=None, model=None
     ):
         """Create a new job."""
-        from kge.job import TrainingJob, EvaluationJob, SearchJob
+        from kge.job import TrainingJob, EvaluationJob, InferringJob, SearchJob
 
         if dataset is None:
             dataset = Dataset.create(config)
@@ -79,6 +79,10 @@ class Job:
             return SearchJob.create(config, dataset, parent_job=parent_job)
         elif job_type == "eval":
             return EvaluationJob.create(
+                config, dataset, parent_job=parent_job, model=model
+            )
+        elif job_type == "infer":
+            return InferringJob.create(
                 config, dataset, parent_job=parent_job, model=model
             )
         else:

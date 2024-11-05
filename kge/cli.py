@@ -13,7 +13,7 @@ from kge.misc import get_git_revision_short_hash, kge_base_dir, is_number
 from kge.util.dump import add_dump_parsers, dump
 from kge.util.io import get_checkpoint_file, load_checkpoint
 from kge.util.package import package_model, add_package_parser
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3,4,5,6'
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 def argparse_bool_type(v):
@@ -122,7 +122,12 @@ def create_parser(config, additional_args=[]):
         help="Evaluate the result of a prior job using test data",
         parents=[parser_conf],
     )
-    for p in [parser_resume, parser_eval, parser_valid, parser_test]:
+    parser_infer = subparsers.add_parser(
+        "infer",
+        help="Score the hidden data using trained model",
+        parents=[parser_conf],
+    )
+    for p in [parser_resume, parser_eval, parser_valid, parser_test, parser_infer]:
         p.add_argument("config", type=str)
         p.add_argument(
             "--checkpoint",
@@ -162,6 +167,9 @@ def main():
     )
     process_meta_command(
         args, "valid", {"command": "resume", "job.type": "eval", "eval.split": "valid"}
+    )
+    process_meta_command(
+        args, "infer", {"command": "resume", "job.type": "infer", "eval.split": "infer"}
     )
     # dump command
     if args.command == "dump":

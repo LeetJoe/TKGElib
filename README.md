@@ -47,6 +47,7 @@ You can evaluate the trained models on dev/test set using the following commands
 ``` sh
 python -m kge eval <saved_dir>
 python -m kge test <saved_dir>
+python -m kge infer <saved_dir>
 ```
 
 ## Acknowledgment
