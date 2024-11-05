@@ -35,9 +35,13 @@ class EntityRankingJob(EvaluationJob):
         for split in self.filter_splits:
             self.dataset.index(f"{split}_sp_to_o")
             self.dataset.index(f"{split}_po_to_s")
+            self.dataset.index(f"{split}_spt_to_o")  # todo indexing modified
+            self.dataset.index(f"{split}_pot_to_s")  # todo indexing modified
         if "test" not in self.filter_splits and self.filter_with_test:
             self.dataset.index("test_sp_to_o")
             self.dataset.index("test_po_to_s")
+            self.dataset.index("test_spt_to_o")  # todo indexing modified
+            self.dataset.index("test_pot_to_s")  # todo indexing modified
 
         # and data loader
         self.loader = torch.utils.data.DataLoader(
