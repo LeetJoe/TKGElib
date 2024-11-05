@@ -56,21 +56,27 @@ class EntityRankingJob(EvaluationJob):
         "Looks up true triples for each triple in the batch"
         label_coords = []
         for split in self.filter_splits:
-            split_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(
+            split_label_coords = kge.job.util.get_spt_pot_coords_from_spot_batch(  # todo indexing modified
+            # split_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(
                 batch,
                 self.dataset.num_entities(),
-                self.dataset.index(f"{split}_sp_to_o"),
-                self.dataset.index(f"{split}_po_to_s"),
+                self.dataset.index(f"{split}_spt_to_o"),  # todo indexing modified
+                self.dataset.index(f"{split}_pot_to_s"),  # todo indexing modified
+                # self.dataset.index(f"{split}_sp_to_o"),
+                # self.dataset.index(f"{split}_po_to_s"),
             )
             label_coords.append(split_label_coords)
         label_coords = torch.cat(label_coords)
 
         if "test" not in self.filter_splits and self.filter_with_test:
-            test_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(
+            test_label_coords = kge.job.util.get_spt_pot_coords_from_spot_batch(  # todo indexing modified
+            # test_label_coords = kge.job.util.get_spt_pot_coords_from_spot_batch(
                 batch,
                 self.dataset.num_entities(),
-                self.dataset.index("test_sp_to_o"),
-                self.dataset.index("test_po_to_s"),
+                self.dataset.index("test_spt_to_o"),  # todo indexing modified
+                self.dataset.index("test_pot_to_s"),  # todo indexing modified
+                # self.dataset.index("test_sp_to_o"),
+                # self.dataset.index("test_po_to_s"),
             )
         else:
             test_label_coords = torch.zeros([0, 3], dtype=torch.long)

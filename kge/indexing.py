@@ -47,6 +47,18 @@ def index_KvsAll(dataset: "Dataset", split: str, key: str):
         key_cols = [0, 2]
         value_column = 1
         value = "p"
+    elif key == "spt":
+        key_cols = [0, 1, 3]
+        value_column = 2
+        value = "o"
+    elif key == "pot":
+        key_cols = [1, 2, 3]
+        value_column = 0
+        value = "s"
+    elif key == "sot":
+        key_cols = [0, 2, 3]
+        value_column = 1
+        value = "p"
     else:
         raise ValueError()
 
@@ -176,7 +188,7 @@ def index_neighbor_dig(dataset):
             pre = list(G.predecessors(s))
             suc_edge_types = [G.get_edge_data(s, v)['type'] + dataset.num_relations() for v in suc]
             pre_edge_types = [G.get_edge_data(v, s)['type'] for v in pre]
-            suc_edge_times = [G.get_edge_data(s, v)['time'] for v in suc] 
+            suc_edge_times = [G.get_edge_data(s, v)['time'] for v in suc]
             pre_edge_times = [G.get_edge_data(v, s)['time'] for v in pre]
             rand_permut = rng.permutation(len(suc) + len(pre))
             neighbor = np.asarray(suc + pre)[rand_permut]
@@ -343,7 +355,7 @@ def _invert_ids(dataset, obj: str):
 
 def create_default_index_functions(dataset: "Dataset"):
     for split in dataset.files_of_type("triples"):
-        for key, value in [("sp", "o"), ("po", "s"), ("so", "p")]:
+        for key, value in [("sp", "o"), ("po", "s"), ("so", "p"), ("spt", "o"), ("pot", "s"), ("sot", "p")]:
             # self assignment needed to capture the loop var
             dataset.index_functions[f"{split}_{key}_to_{value}"] = IndexWrapper(
                 index_KvsAll, split=split, key=key
@@ -366,7 +378,7 @@ def where_in(x, y, not_in=False):
 
     x and y are assumed to be 1 dimensional arrays.
 
-    :params: not_in: if True, returns the indices of the of the elements in x
+    :params: not_in: if True, returns the indices of the elements in x
     which are not in y.
 
     """

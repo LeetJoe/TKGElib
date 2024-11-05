@@ -19,6 +19,7 @@ import os.path
 import numpy as np
 from collections import OrderedDict
 
+
 def store_map(symbol_map, filename):
     with open(filename, "w") as f:
         for symbol, index in symbol_map.items():
@@ -32,11 +33,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print(f"Preprocessing {args.folder}...")
-    raw_split_files = {"train": "train.txt", "valid": "valid.txt", "test": "test.txt"}
-    split_files = {"train": "train.del", "valid": "valid.del", "test": "test.del"}
-    string_files = {"entity_strings": "entity_strings.del", "relation_strings": "relation_strings.del", "time_strings": "time_strings.del"}
-    split_files_without_unseen = {"train_sample": "train_sample.del", "valid_without_unseen": "valid_without_unseen.del", 
-            "test_without_unseen": "test_without_unseen.del"}
+    raw_split_files = {"train": "train.txt", "valid": "valid.txt", "test": "test.txt", "infer": "infer.txt"}
+    split_files = {"train": "train.del", "valid": "valid.del", "test": "test.del", "infer": "infer.del"}
+    string_files = {"entity_strings": "entity_strings.del", "relation_strings": "relation_strings.del",
+                    "time_strings": "time_strings.del"}
+    split_files_without_unseen = {"train_sample": "train_sample.del",
+                                  "valid_without_unseen": "valid_without_unseen.del",
+                                  "test_without_unseen": "test_without_unseen.del",
+                                  "infer_without_unseen": "infer_without_unseen.del"}
     split_sizes = {}
 
     if args.order_sop:
@@ -80,7 +84,7 @@ if __name__ == "__main__":
                 entities_in_train = entities.copy()
                 relations_in_train = relations.copy()
                 times_in_train = times.copy()
-    
+
     print(f"{len(relations)} distinct relations")
     print(f"{len(entities)} distinct entities")
     print(f"{len(times)} distinct entities")
@@ -94,14 +98,14 @@ if __name__ == "__main__":
     print("Writing triples...")
     without_unseen_sizes = {}
     for split, filename in split_files.items():
-        if split in ["valid", "test"]:
+        if split in ["valid", "test", "infer"]:
             split_without_unseen = split + "_without_unseen"
-            f_wo_unseen = open(os.path.join(args.folder, 
-                                split_files_without_unseen[split_without_unseen]), "w")
+            f_wo_unseen = open(os.path.join(args.folder,
+                                            split_files_without_unseen[split_without_unseen]), "w")
         else:
             split_without_unseen = split + "_sample"
-            f_tr_sample = open(os.path.join(args.folder, 
-                                split_files_without_unseen[split_without_unseen]), "w")
+            f_tr_sample = open(os.path.join(args.folder,
+                                            split_files_without_unseen[split_without_unseen]), "w")
             train_sample = np.random.choice(split_sizes["train"], split_sizes["valid"], False)
         with open(os.path.join(args.folder, filename), "w") as f:
             size_unseen = 0
@@ -128,8 +132,8 @@ if __name__ == "__main__":
                         + "\n"
                     )
                     size_unseen += 1
-                elif split in ["valid", "test"] and t[S] in entities_in_train and \
-                    t[O] in entities_in_train and t[P] in relations_in_train:
+                elif split in ["valid", "test", "infer"] and t[S] in entities_in_train and \
+                        t[O] in entities_in_train and t[P] in relations_in_train:
                     f_wo_unseen.write(
                         str(entities[t[S]])
                         + "\t"
@@ -151,7 +155,7 @@ if __name__ == "__main__":
         num_relations=len(relations),
         num_times=len(times)
     )
-    for obj in [ "entity", "relation", "time" ]:
+    for obj in ["entity", "relation", "time"]:
         dataset_config[f"files.{obj}_ids.filename"] = f"{obj}_ids.del"
         dataset_config[f"files.{obj}_ids.type"] = "map"
     for split in split_files.keys():
