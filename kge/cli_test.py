@@ -285,6 +285,7 @@ def main():
 
             # 如果是 resume，尝试加载 checkpoint
             if args.command == "resume":
+                # 如果执行的是 test/eval 等非 train 任务，默认会从指定的目录中加载 checkpoint 文件然后走这个分支
                 if checkpoint_file is not None:
                     checkpoint = load_checkpoint(
                         checkpoint_file, config.get("job.device")
