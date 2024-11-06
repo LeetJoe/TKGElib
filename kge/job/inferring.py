@@ -112,6 +112,7 @@ class InferringJob(Job):
 
             # compute true scores beforehand, since we can't get them from a chunked
             # score table, 最后一个 "o"/"s" 表示 direction
+            # ECEformer 使用的是点积相似度
             o_true_scores = self.model("score_spo", s, p, o, t, "o").view(-1)
             s_true_scores = self.model("score_spo", s, p, o, t, "s").view(-1)
 
@@ -145,12 +146,12 @@ class InferringJob(Job):
                     self.trace(
                         event="example_rank",
                         task="po",
-                        score=s_true_scores[i].item(),  # todo put po score here
+                        score=s_true_scores[i].item(),
                         **entry,
                     )
 
             # optionally: trace batch metrics
-            if False and self.trace_batch:  # 这里在配置文件里是 true —— 如果 trace level 是 example，这个就是 true。
+            if self.trace_batch:  # 这里在配置文件里是 true —— 如果 trace level 是 example，这个就是 true。
                 self.trace(
                     event="batch_completed",
                     type="hidden_inference",
@@ -193,7 +194,6 @@ class InferringJob(Job):
             epoch_time=epoch_time,
             event="infer_completed"
         )
-        self.post_epoch_trace_hooks = []  # todo 这个最后要删除掉
         for f in self.post_epoch_trace_hooks:
             f(self, trace_entry)
 

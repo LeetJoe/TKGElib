@@ -37,6 +37,8 @@ class ECEformerScorer(RelationalScorer):
         self.atomic_type_embeds = nn.Embedding(4, self.dim)
         torch.nn.init.normal_(self.atomic_type_embeds.weight, std=self.initializer_range)
 
+        # 这个 similarity 取自 model 目录里的 eceformer.yaml 配置文件里的 similarity 配置项，值是一个类，
+        # 可以在 util.similarity.py 文件中找到它。
         self.similarity = getattr(similarity, self.get_option("similarity"))(self.dim)
         self.layer_norm = BertLayerNorm(self.dim, eps=1e-12)
         self.atomic_layer_norm = BertLayerNorm(self.dim, eps=1e-12)
@@ -238,6 +240,7 @@ class ECEformerScorer(RelationalScorer):
     def _scoring(self, s_emb, p_emb, o_emb, t_emb, is_pairwise, ids, gt_ent, gt_rel, gt_tim, t_ids):
         encoder_output, self_pred_loss = self._get_encoder_output(s_emb, p_emb, t_emb, ids, gt_ent, gt_rel, gt_tim, t_ids)
         o_emb = F.dropout(o_emb, p=self.get_option("output_dropout"), training=self.training)
+        # 这里的 similarity 使用的是点积，即 target 与预测结果的向量形式的点积
         target_scores = self.similarity(encoder_output, o_emb, is_pairwise).view(p_emb.size(0), -1)
         if self.training:
             return target_scores, self_pred_loss

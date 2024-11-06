@@ -114,41 +114,41 @@ class RelationalScorer(KgeBase):
 
         The embeddings are combined row-wise. The output is a :math`n\times 1` tensor,
         in which the :math:`i`-th entry holds the score of the embedding triple
-        :math:`(s_i, p_i, o_i)`.
+        :math:`(s_i, p_i, o_i, t_i)`.
 
         """
         return self.score_emb(s_emb, p_emb, o_emb, t_emb, "spo")
 
     def score_emb(
-        self, s_emb: Tensor, p_emb: Tensor, o_emb, t_emb: Tensor, combine: str
+        self, s_emb: Tensor, p_emb: Tensor, o_emb: Tensor, t_emb: Tensor, combine: str
     ) -> Tensor:
         r"""Scores a set of triples specified by their embeddings.
 
-        `s_emb`, `p_emb`, and `o_emb` are tensors of size :math:`n_s\times d_e`,
-        :math:`n_p\times d_r`, and :math:`n_o\times d_e`, where :math:`d_e` and
-        :math:`d_r` are the sizes of the entity and relation embeddings, respectively.
+        `s_emb`, `p_emb`, `o_emb` and `t_emb` are tensors of size :math:`n_s\times d_e`,
+        :math:`n_p\times d_r`, :math:`n_o\times d_e` and :math:`n_t\times d_t`, where :math:`d_e`,
+        :math:`d_r` and :math:`d_t` are the sizes of the entity, relation and time embeddings, respectively.
 
         The provided embeddings are combined based on the value of `combine`. Common
         values are :code:`"spo"`, :code:`"sp_"`, and :code:`"_po"`. Not all models may
         support all combinations.
 
         When `combine` is :code:`"spo"`, then embeddings are combined row-wise. In this
-        case, it is required that :math:`n_s=n_p=n_o=n`. The output is identical to
-        :func:`~RelationalScorer.score_emb_spo`, i.e., a :math`n\times 1` tensor, in
+        case, it is required that :math:`n_s=n_p=n_o=n_t=n`. The output is identical to
+        :func:`~RelationalScorer.score_emb_spo`, i.e., a :math:`n\times 1` tensor, in
         which the :math:`i`-th entry holds the score of the embedding triple
-        :math:`(s_i, p_i, o_i)`.
+        :math:`(s_i, p_i, o_i, t_i)`.
 
         When `combine` is :code:`"sp_"`, the subjects and predicates are taken row-wise
         and subsequently combined with all objects. In this case, it is required that
-        :math:`n_s=n_p=n`. The output is a :math`n\times n_o` tensor, in which the
+        :math:`n_s=n_p=n_t=n`. The output is a :math:`n\times n_o` tensor, in which the
         :math:`(i,j)`-th entry holds the score of the embedding triple :math:`(s_i, p_i,
-        o_j)`.
+        o_j, t_i)`.
 
         When `combine` is :code:`"_po"`, predicates and objects are taken row-wise and
         subsequently combined with all subjects. In this case, it is required that
-        :math:`n_p=n_o=n`. The output is a :math`n\times n_s` tensor, in which the
+        :math:`n_p=n_o=n_t=n`. The output is a :math:`n\times n_s` tensor, in which the
         :math:`(i,j)`-th entry holds the score of the embedding triple :math:`(s_j, p_i,
-        o_i)`.
+        o_i, t_i)`.
 
         """
         n = p_emb.size(0)
