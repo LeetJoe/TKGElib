@@ -169,7 +169,7 @@ def main():
         args, "valid", {"command": "resume", "job.type": "eval", "eval.split": "valid"}
     )
     process_meta_command(
-        args, "infer", {"command": "resume", "job.type": "infer", "eval.split": "infer"}
+        args, "infer", {"command": "resume", "job.type": "infer", "infer.split": "infer"}
     )
     # dump command
     if args.command == "dump":

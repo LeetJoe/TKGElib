@@ -82,7 +82,7 @@ class Job:
                 config, dataset, parent_job=parent_job, model=model
             )
         elif job_type == "infer":
-            return InferringJob.create(
+            return InferringJob(
                 config, dataset, parent_job=parent_job, model=model
             )
         else:

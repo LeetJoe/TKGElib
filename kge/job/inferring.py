@@ -4,14 +4,13 @@ import time
 import torch
 from kge.job import Job
 from kge import Config, Dataset
-from collections import defaultdict
 
 
 class InferringJob(Job):
     """ Entity ranking evaluation protocol """
 
     def __init__(self, config: Config, dataset: Dataset, parent_job, model):
-        super().__init__(config, dataset, parent_job, model)
+        super().__init__(config, dataset, parent_job)
 
         self.config = config
         self.dataset = dataset
