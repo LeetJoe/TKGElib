@@ -120,7 +120,7 @@ class InferringJob(Job):
             # 这个设置为 true 之后，所有的 query 的相关信息都会 trace 出来，在 eval job 里会执行，输出在 trace.yaml 文件里
             # 输出有 s, p, o, t, task(sp, po), split(test), filter([train,valid,test]),rank, rank_filtered
             # todo: 还缺个 score
-            if False and self.trace_examples:
+            if self.trace_examples:
                 entry = {
                     "type": "hidden_inference",
                     "scope": "example",
@@ -144,7 +144,7 @@ class InferringJob(Job):
                         **entry,
                     )
                     self.trace(
-                        event="example_rank",
+                        event="query_score",
                         task="po",
                         score=s_true_scores[i].item(),
                         **entry,

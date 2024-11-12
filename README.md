@@ -23,7 +23,8 @@ First download the standard benchmark datasets. The Data folder can be downloade
 cd data
 # for GDELT/ICEWS14/ICEWS05-15/ICEWS18
 # e.g. python preprocess.py icews14
-python preprocess.py $dataset_name
+python preprocess.py $dataset_name --init  # for train, valid, test, and 'found' merge
+python preprocess.py $dataset_name  # for infer
 # for YAGO11k and WikiData12k
 python preprocess_intravel.py $dataset_name
 ```
