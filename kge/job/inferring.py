@@ -1,9 +1,56 @@
 import math
 import time
+import re
+import os
+import json
 
 import torch
 from kge.job import Job
 from kge import Config, Dataset
+
+
+def _get_annotation_from_trace(dataset: Dataset, exp_dir):
+    entities = dataset.entity_ids()
+    relations = dataset.relation_ids()
+    times = dataset.time_ids()
+
+    trace_file = os.path.join(exp_dir, 'trace.yaml')
+    save_file = os.path.join(exp_dir, 'annotation.tsv')
+
+    save_dict = {}
+    with open(trace_file, 'r') as fr:
+        for line in fr:
+            line = re.sub('\s', '', line)
+            line = re.sub(',', '\",\"', line)
+            line = re.sub(':', '\":\"', line)
+            line = re.sub('{}', '', line)
+            line = re.sub('\[\]', '', line)
+            line = re.sub('\"\[', '[\"', line)
+            line = re.sub('\]\"', '\"]', line)
+            line = re.sub('{', '{\"', line)
+            line = re.sub('}', '\"}', line)
+            try:
+                line_data = json.loads(line)
+            except Exception as e:
+                continue
+            if ('event' in line_data) and (line_data['event'] == 'query_score'):
+                s = entities[int(line_data['s'])]
+                p = relations[int(line_data['p'])]
+                o = entities[int(line_data['o'])]
+                t = times[int(line_data['t'])]
+                score = float(line_data['score'])
+
+                key = (s, p, o)
+                if (key not in save_dict) or (save_dict[key][1] < score):
+                    save_dict[key] = [t, score]
+        fr.close()
+
+    with open(save_file, 'w') as fw:
+        for key, value in save_dict.items():
+            fw.write('{}\t{}\t{}\t{}\t{}\n'.format(
+                key[0], key[1], key[2], value[0], torch.sigmoid(torch.Tensor([value[1] * 0.1])).item())
+            )
+        fw.close()
 
 
 class InferringJob(Job):
@@ -42,7 +89,9 @@ class InferringJob(Job):
         self.post_epoch_trace_hooks = []
 
         #: Signature: job, trace_entry
-        self.post_valid_hooks = []
+        self.post_infer_hooks = [
+            self._save_annotation
+        ]
 
         self.is_prepared = False
 
@@ -205,8 +254,10 @@ class InferringJob(Job):
             self.model.train()  # todo: 这个操作是 reset model？？
         # self.config.log("Finished inferring on " + self.infer_split + " split.")  # todo 这个要解除注释
 
-        for f in self.post_valid_hooks:  # todo: 这个似乎也是空的
-            f(self, trace_entry)
+        for f in self.post_infer_hooks:
+            f()
 
         return trace_entry
 
+    def _save_annotation(self):
+        _get_annotation_from_trace(self.dataset, self.config.folder)
