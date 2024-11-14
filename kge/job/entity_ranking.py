@@ -38,16 +38,16 @@ class EntityRankingJob(EvaluationJob):
         for split in self.filter_splits:
             # dataset.index(key) 这个方法关键看 key 的值，比如 valid_sp_to_o 表示把 valid 数据，以 (s, p) 为键，而 [o1,o2...] 为值
             # 的形式构建成一个 OrderList。初次调用会把组织结果缓存起来，方便后面使用。
-            self.dataset.index(f"{split}_sp_to_o")
-            self.dataset.index(f"{split}_po_to_s")
+            # self.dataset.index(f"{split}_sp_to_o")
+            # self.dataset.index(f"{split}_po_to_s")
             self.dataset.index(f"{split}_spt_to_o")  # todo indexing modified
             self.dataset.index(f"{split}_pot_to_s")  # todo indexing modified
 
         # 这个条件是为了防止 test 在 filter_splits 且 filter_with_test 为 True 重复加载 test 数据；而在 test 不在 filter_splits 里
         # 但 filter_with_test 为 True 保证要加入 test 数据。
         if "test" not in self.filter_splits and self.filter_with_test:
-            self.dataset.index("test_sp_to_o")
-            self.dataset.index("test_po_to_s")
+            # self.dataset.index("test_sp_to_o")
+            # self.dataset.index("test_po_to_s")
             self.dataset.index("test_spt_to_o")  # todo indexing modified
             self.dataset.index("test_pot_to_s")  # todo indexing modified
 
