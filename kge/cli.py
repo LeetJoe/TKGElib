@@ -13,7 +13,7 @@ from kge.misc import get_git_revision_short_hash, kge_base_dir, is_number
 from kge.util.dump import add_dump_parsers, dump
 from kge.util.io import get_checkpoint_file, load_checkpoint
 from kge.util.package import package_model, add_package_parser
-os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3,4,5,6'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6'
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 def argparse_bool_type(v):

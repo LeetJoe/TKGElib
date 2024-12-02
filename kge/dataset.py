@@ -14,7 +14,7 @@ import inspect
 from kge import Config, Configurable
 import kge.indexing
 from kge.indexing import create_default_index_functions
-from kge.misc import kge_base_dir
+from kge.misc import kge_base_dir, cur_base_dir
 
 from typing import Dict, List, Any, Callable, Union, Optional
 
@@ -106,7 +106,8 @@ class Dataset(Configurable):
         # 参数处理
         name = config.get("dataset.name")
         if folder is None:
-            folder = os.path.join(kge_base_dir(), "data", name)
+            # folder = os.path.join(kge_base_dir(), "data", name)
+            folder = os.path.join(cur_base_dir(), "data", name)
         if os.path.isfile(os.path.join(folder, "dataset.yaml")):
             # 这个 dataset.yaml 跟配置文件里的 yaml 没有关系，它是在 preprocess 的时候生成的，里面记录了数据集的基本情况
             config.log("Loading configuration of dataset " + name + "...")
@@ -116,9 +117,9 @@ class Dataset(Configurable):
         dataset = Dataset(config, folder)
         if preload_data:
             # 这三句就是加载 entities map, relations map, times map 的，对应的文件是 entity_ids,del, relation_ids.del, time_ids.del
-            dataset.entity_ids()
-            dataset.relation_ids()
-            dataset.time_ids()
+            # dataset.entity_ids()
+            # dataset.relation_ids()
+            # dataset.time_ids()
             # 这三句是加载四元组的，对应的是 train.del, valid.del, test.del，使用 np.loadtxt 完成的
             for split in ["train", "valid", "test"]:
                 dataset.split(split)

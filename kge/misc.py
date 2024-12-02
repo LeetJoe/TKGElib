@@ -72,6 +72,10 @@ def kge_base_dir():
     return os.path.abspath(filename_in_module(kge, ".."))
 
 
+def cur_base_dir():
+    return os.getcwd()
+
+
 def filename_in_module(module_or_module_list, filename):
     if not isinstance(module_or_module_list, list):
         module_or_module_list = [module_or_module_list]
