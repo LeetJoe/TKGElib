@@ -9,11 +9,7 @@ from kge.job import Job
 from kge import Config, Dataset
 
 
-def _get_annotation_from_trace(dataset: Dataset, exp_dir):
-    entities = dataset.entity_ids()
-    relations = dataset.relation_ids()
-    times = dataset.time_ids()
-
+def _get_annotation_from_trace(exp_dir):
     trace_file = os.path.join(exp_dir, 'trace.yaml')
     save_file = os.path.join(exp_dir, 'annotation.tsv')
 
@@ -34,10 +30,10 @@ def _get_annotation_from_trace(dataset: Dataset, exp_dir):
             except Exception as e:
                 continue
             if ('event' in line_data) and (line_data['event'] == 'query_score'):
-                s = entities[int(line_data['s'])]
-                p = relations[int(line_data['p'])]
-                o = entities[int(line_data['o'])]
-                t = times[int(line_data['t'])]
+                s = int(line_data['s'])
+                p = int(line_data['p'])
+                o = int(line_data['o'])
+                t = int(line_data['t'])
                 score = float(line_data['score'])
 
                 key = (s, p, o)
@@ -260,4 +256,4 @@ class InferringJob(Job):
         return trace_entry
 
     def _save_annotation(self):
-        _get_annotation_from_trace(self.dataset, self.config.folder)
+        _get_annotation_from_trace(self.config.folder)

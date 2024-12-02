@@ -117,9 +117,9 @@ class Dataset(Configurable):
         dataset = Dataset(config, folder)
         if preload_data:
             # 这三句就是加载 entities map, relations map, times map 的，对应的文件是 entity_ids,del, relation_ids.del, time_ids.del
-            # dataset.entity_ids()
-            # dataset.relation_ids()
-            # dataset.time_ids()
+            dataset.entity_ids()
+            dataset.relation_ids()
+            dataset.time_ids()
             # 这三句是加载四元组的，对应的是 train.del, valid.del, test.del，使用 np.loadtxt 完成的
             for split in ["train", "valid", "test"]:
                 dataset.split(split)
