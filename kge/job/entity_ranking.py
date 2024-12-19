@@ -1,11 +1,38 @@
 import math
 import time
 
+import os
 import torch
 import kge.job
 from kge.job import EvaluationJob, Job
 from kge import Config, Dataset
 from collections import defaultdict
+
+
+def _get_test_prediction_from_trace(job: Job, trace_entry):
+    exp_dir = job.config.folder
+    trace_file = os.path.join(exp_dir, 'trace.yaml')
+    save_file = os.path.join(exp_dir, 'pred_kge.tsv')
+
+    save_dict = {}
+    with open(trace_file, 'r') as fr:
+        with open(save_file, 'w') as fw:
+            for line in fr:
+                line_data = Job.trace_line_to_json(line)
+                if ('event' in line_data) and (line_data['event'] == 'example_rank'):
+                    s = int(line_data['s'])
+                    p = int(line_data['p'])
+                    o = int(line_data['o'])
+                    t = int(line_data['t'])
+                    task = line_data['task']
+                    rank = line_data['rank_filtered']
+                    candidates = line_data['candidates']
+
+                    fw.write('{}\t{}\t{}\t{}\t{}\t{}\n{}\n'.format(
+                        s, p, o, t, task, rank, candidates)
+                    )
+            fw.close()
+        fr.close()
 
 
 class EntityRankingJob(EvaluationJob):
@@ -18,6 +45,10 @@ class EntityRankingJob(EvaluationJob):
             ["rounded_mean_rank", "best_rank", "worst_rank"],
         )
         self.tie_handling = self.config.get("eval.tie_handling")
+
+        if self.config.get("eval.split") == 'test':
+            self.post_valid_hooks.append(_get_test_prediction_from_trace)
+
         self.is_prepared = False
 
         if self.__class__ == EntityRankingJob:
@@ -196,6 +227,12 @@ class EntityRankingJob(EvaluationJob):
             else:
                 chunk_size = self.dataset.num_entities()
 
+            batch_scores_sp = {}
+            batch_scores_po = {}
+            for ranking in rankings:
+                batch_scores_sp[ranking] = torch.zeros((len(batch),num_entities ), dtype=torch.float).to(self.device)
+                batch_scores_po[ranking] = torch.zeros((len(batch),num_entities ), dtype=torch.float).to(self.device)
+
             # process chunk by chunk
             # 这里 chunk 并不是对 batch 进行进一步的分批，而是在进行 _po/sp_ 预测的时候，对目标所属的 entities 集合进行
             # chunk，避免 entities 过多单批推理负载过重，限定候选范围多次推理，用时间换空间。
@@ -265,6 +302,9 @@ class EntityRankingJob(EvaluationJob):
                     # from now on, use filtered scores
                     scores_sp = scores_sp_filt
                     scores_po = scores_po_filt
+
+                    batch_scores_sp[ranking][:, chunk_start : chunk_end] += scores_sp
+                    batch_scores_po[ranking][:, chunk_start : chunk_end] += scores_po
 
                     # update rankings，这里的 += 就是 cat()
                     ranks_and_ties_for_ranking["s" + ranking][0] += s_rank_chunk
@@ -354,6 +394,8 @@ class EntityRankingJob(EvaluationJob):
                         task="sp",
                         rank=o_ranks[i].item() + 1,
                         rank_filtered=o_ranks_filt[i].item() + 1,
+                        # candidates=batch_scores_sp['_filt'][i].tolist(),
+                        candidates="asdfasdf",
                         **entry,
                     )
                     if filter_with_test:
@@ -365,6 +407,8 @@ class EntityRankingJob(EvaluationJob):
                         task="po",
                         rank=s_ranks[i].item() + 1,
                         rank_filtered=s_ranks_filt[i].item() + 1,
+                        # candidates=batch_scores_po['_filt'][i].tolist(),
+                        candidates="asdfasdf",
                         **entry,
                     )
 
@@ -492,7 +536,7 @@ class EntityRankingJob(EvaluationJob):
             self.model.train()  # todo: 这个操作是 reset model？？
         self.config.log("Finished evaluating on " + self.eval_split + " split.")
 
-        for f in self.post_valid_hooks:  # todo: 这个似乎也是空的
+        for f in self.post_valid_hooks:
             f(self, trace_entry)
 
         return trace_entry

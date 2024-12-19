@@ -11,29 +11,23 @@ def _get_annotation_from_trace(exp_dir):
     trace_file = os.path.join(exp_dir, 'trace.yaml')
     save_file = os.path.join(exp_dir, 'annotation.tsv')
 
-    save_dict = {}
     with open(trace_file, 'r') as fr:
-        for line in fr:
-            line_data = Job.trace_line_to_json(line)
+        with open(save_file, 'w') as fw:
+            for line in fr:
+                line_data = Job.trace_line_to_json(line)
 
-            if ('event' in line_data) and (line_data['event'] == 'query_score'):
-                s = int(line_data['s'])
-                p = int(line_data['p'])
-                o = int(line_data['o'])
-                t = int(line_data['t'])
-                score = float(line_data['score'])
+                if ('event' in line_data) and (line_data['event'] == 'query_score'):
+                    s = int(line_data['s'])
+                    p = int(line_data['p'])
+                    o = int(line_data['o'])
+                    t = int(line_data['t'])
+                    score = float(line_data['score'])
 
-                key = (s, p, o)
-                # if (key not in save_dict) or (save_dict[key][1] < score):
-                save_dict[key] = [t, score]
+                    fw.write('{}\t{}\t{}\t{}\t{}\n'.format(
+                        s, p, o, t, torch.sigmoid(torch.Tensor([score * 0.1])).item())
+                    )
+            fw.close()
         fr.close()
-
-    with open(save_file, 'w') as fw:
-        for key, value in save_dict.items():
-            fw.write('{}\t{}\t{}\t{}\t{}\n'.format(
-                key[0], key[1], key[2], value[0], torch.sigmoid(torch.Tensor([value[1] * 0.1])).item())
-            )
-        fw.close()
 
 
 class InferringJob(Job):
