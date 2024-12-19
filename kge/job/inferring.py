@@ -1,8 +1,6 @@
 import math
 import time
-import re
 import os
-import json
 
 import torch
 from kge.job import Job
@@ -16,19 +14,8 @@ def _get_annotation_from_trace(exp_dir):
     save_dict = {}
     with open(trace_file, 'r') as fr:
         for line in fr:
-            line = re.sub('\s', '', line)
-            line = re.sub(',', '\",\"', line)
-            line = re.sub(':', '\":\"', line)
-            line = re.sub('{}', '', line)
-            line = re.sub('\[\]', '', line)
-            line = re.sub('\"\[', '[\"', line)
-            line = re.sub('\]\"', '\"]', line)
-            line = re.sub('{', '{\"', line)
-            line = re.sub('}', '\"}', line)
-            try:
-                line_data = json.loads(line)
-            except Exception as e:
-                continue
+            line_data = Job.trace_line_to_json(line)
+
             if ('event' in line_data) and (line_data['event'] == 'query_score'):
                 s = int(line_data['s'])
                 p = int(line_data['p'])

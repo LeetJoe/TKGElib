@@ -6,6 +6,8 @@ import uuid
 
 from kge.misc import get_git_revision_short_hash
 import os
+import re
+import json
 import socket
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -151,3 +153,21 @@ class Job:
         return self.config.trace(
             job_id=self.job_id, job=self.config.get("job.type"), **kwargs
         )
+
+    @staticmethod
+    def trace_line_to_json(line: str):
+        line = re.sub('\s', '', line)
+        line = re.sub(',', '\",\"', line)
+        line = re.sub(':', '\":\"', line)
+        line = re.sub('{}', '', line)
+        line = re.sub('\[\]', '', line)
+        line = re.sub('\"\[', '[\"', line)
+        line = re.sub('\]\"', '\"]', line)
+        line = re.sub('{', '{\"', line)
+        line = re.sub('}', '\"}', line)
+        try:
+            line_data = json.loads(line)
+        except Exception as e:
+            line_data = {}
+
+        return line_data
