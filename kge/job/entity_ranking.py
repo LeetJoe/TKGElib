@@ -33,7 +33,7 @@ class EntityRankingJob(EvaluationJob):
         # create data and precompute indexes
         # 配置文件里的 eval.split 使用的是 valid
         # 使用 np.load() 得到 shape = (n, 4) 的数据再使用 torch.from_numpy() 转化成 tensor
-        self.triples = self.dataset.split(self.config.get("eval.split"))  # todo 需要考虑下如何使用 test
+        self.triples = self.dataset.split(self.config.get("eval.split"))
         # filter_splits 一般包含 train 和 valid，这里按 sp_to_o 和 po_to_s 分跟 TLogic 里设置逆关系的思路应该是一样的
         for split in self.filter_splits:
             # dataset.index(key) 这个方法关键看 key 的值，比如 valid_sp_to_o 表示把 valid 数据，以 (s, p) 为键，而 [o1,o2...] 为值
@@ -60,7 +60,7 @@ class EntityRankingJob(EvaluationJob):
             shuffle=False,
             batch_size=self.batch_size,
             # 这个 num_workers 表示用来拆分 batch 的进程数量，配置文件里使用的是 0，表示不使用子进程。
-            num_workers=self.config.get("eval.num_workers"),  # todo 如果 > 0 会是什么效果？进程安全吗？
+            num_workers=self.config.get("eval.num_workers"),
             pin_memory=self.config.get("eval.pin_memory"),  # 配置文件里使用的是 False，不是 True 性能会更好吗？会有什么问题？
         )
         # let the model add some hooks, if it wants to do so
@@ -106,12 +106,12 @@ class EntityRankingJob(EvaluationJob):
         batch = torch.cat(batch).reshape((-1, 4))
         return batch, label_coords, test_label_coords
 
-    @torch.no_grad()  # todo 注意这里有个 no_grad()
+    @torch.no_grad()
     def run(self) -> dict:
         self._prepare()
 
         was_training = self.model.training  # 这个是状态参数？
-        self.model.eval()  # 这个是模块里提供的方法 todo 这个 model 在哪里实例化的，没找到？
+        self.model.eval()  # 这个是模块里提供的方法
         self.config.log(
             "Evaluating on "
             + self.eval_split

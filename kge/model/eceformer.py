@@ -42,7 +42,8 @@ class ECEformerScorer(RelationalScorer):
         self.similarity = getattr(similarity, self.get_option("similarity"))(self.dim)
         self.layer_norm = BertLayerNorm(self.dim, eps=1e-12)
         self.atomic_layer_norm = BertLayerNorm(self.dim, eps=1e-12)
-        
+
+        # 这个就是论文里提到的那个 MLPMixer
         self.mixer_encoder = mixer2.MLPMixer(
             # num_channel=3,
             num_ctx=self.max_context_size + 1,

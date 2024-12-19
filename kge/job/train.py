@@ -350,6 +350,7 @@ class TrainingJob(Job):
         backward_time = 0.0
         optimizer_time = 0.0
 
+        # optimizer 的更新周期：每 n 轮
         update_freq = self.config.get("train.update_freq")
         # process each batch
         for batch_index, batch in enumerate(self.loader):

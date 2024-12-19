@@ -20,7 +20,7 @@ train:
   max_epochs: 100
   lr_scheduler: "" #set empty here to use schedule below
   loss_arg: .nan # disable label smoothing
-  optimizer: Adamax
+  optimizer: Adamax  # Adadelta
   optimizer_args:
     lr: 0.01
     warmup: 0.1
