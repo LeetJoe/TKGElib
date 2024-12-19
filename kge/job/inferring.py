@@ -37,8 +37,8 @@ def _get_annotation_from_trace(exp_dir):
                 score = float(line_data['score'])
 
                 key = (s, p, o)
-                if (key not in save_dict) or (save_dict[key][1] < score):
-                    save_dict[key] = [t, score]
+                # if (key not in save_dict) or (save_dict[key][1] < score):
+                save_dict[key] = [t, score]
         fr.close()
 
     with open(save_file, 'w') as fw:
