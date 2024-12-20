@@ -227,11 +227,9 @@ class EntityRankingJob(EvaluationJob):
             else:
                 chunk_size = self.dataset.num_entities()
 
-            batch_scores_sp = {}
-            batch_scores_po = {}
-            for ranking in rankings:
-                batch_scores_sp[ranking] = torch.zeros((len(batch),num_entities ), dtype=torch.float).to(self.device)
-                batch_scores_po[ranking] = torch.zeros((len(batch),num_entities ), dtype=torch.float).to(self.device)
+            # for trace candidates' scores
+            batch_scores_sp = torch.zeros((len(batch),num_entities ), dtype=torch.float).to(self.device)
+            batch_scores_po = torch.zeros((len(batch),num_entities ), dtype=torch.float).to(self.device)
 
             # process chunk by chunk
             # 这里 chunk 并不是对 batch 进行进一步的分批，而是在进行 _po/sp_ 预测的时候，对目标所属的 entities 集合进行
@@ -303,8 +301,9 @@ class EntityRankingJob(EvaluationJob):
                     scores_sp = scores_sp_filt
                     scores_po = scores_po_filt
 
-                    batch_scores_sp[ranking][:, chunk_start : chunk_end] += scores_sp
-                    batch_scores_po[ranking][:, chunk_start : chunk_end] += scores_po
+                    if ranking == '_filt':
+                        batch_scores_sp[:, chunk_start : chunk_end] += scores_sp
+                        batch_scores_po[:, chunk_start : chunk_end] += scores_po
 
                     # update rankings，这里的 += 就是 cat()
                     ranks_and_ties_for_ranking["s" + ranking][0] += s_rank_chunk
@@ -394,8 +393,7 @@ class EntityRankingJob(EvaluationJob):
                         task="sp",
                         rank=o_ranks[i].item() + 1,
                         rank_filtered=o_ranks_filt[i].item() + 1,
-                        # candidates=batch_scores_sp['_filt'][i].tolist(),
-                        candidates="asdfasdf",
+                        candidates=self._candidates_to_str(batch_scores_sp[i]),
                         **entry,
                     )
                     if filter_with_test:
@@ -407,8 +405,7 @@ class EntityRankingJob(EvaluationJob):
                         task="po",
                         rank=s_ranks[i].item() + 1,
                         rank_filtered=s_ranks_filt[i].item() + 1,
-                        # candidates=batch_scores_po['_filt'][i].tolist(),
-                        candidates="asdfasdf",
+                        candidates=self._candidates_to_str(batch_scores_po[i]),
                         **entry,
                     )
 
@@ -700,3 +697,18 @@ num_ties for each true score.
             metrics["hits_at_{}{}".format(k, suffix)] = hits_at_k[k - 1]
 
         return metrics
+
+    def _candidates_to_str(self, batch_scores: torch.Tensor) -> str:
+        values, indices = torch.sort(batch_scores, descending=True)
+        positive_mask = values > 0
+        values = torch.sigmoid(values[positive_mask] * 0.1).tolist()
+        indices = indices[positive_mask].tolist()
+        cand_pair_list = []
+        for cidx in range(len(indices)):
+            cand_pair_list.append([indices[cidx], values[cidx]])
+        cand_pair_list.sort(key=lambda x: x[1], reverse=True)
+        cand_str_list = []
+        for cidx in range(len(indices)):
+            cand_str_list.append('{}*{:.6f}'.format(cand_pair_list[cidx][0], cand_pair_list[cidx][1]))
+
+        return ';'.join(cand_str_list)
