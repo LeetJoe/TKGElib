@@ -369,13 +369,13 @@ class EntityRankingJob(EvaluationJob):
                 entry = {
                     "timestamp": 0,
                     "entry_id": 0,
-                    "type": "entity_ranking",
-                    "scope": "example",
-                    "split": self.eval_split,
-                    "filter_splits": self.filter_splits,
-                    "size": len(batch),
-                    "batches": len(self.loader),
-                    "epoch": self.epoch,
+                    # "type": "entity_ranking",
+                    # "scope": "example",
+                    # "split": self.eval_split,
+                    # "filter_splits": self.filter_splits,
+                    # "size": len(batch),
+                    # "batches": len(self.loader),
+                    # "epoch": self.epoch,
                 }
                 for i in range(len(batch)):
                     entry["batch"] = i

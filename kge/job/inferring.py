@@ -150,12 +150,12 @@ class InferringJob(Job):
                 entry = {
                     "timestamp": 0,
                     "entry_id": 0,
-                    "type": "hidden_inference",
-                    "scope": "example",
-                    "split": self.infer_split,
-                    "size": len(batch),
-                    "batches": len(self.loader),
-                    "epoch": self.epoch,
+                    # "type": "hidden_inference",
+                    # "scope": "example",
+                    # "split": self.infer_split,
+                    # "size": len(batch),
+                    # "batches": len(self.loader),
+                    # "epoch": self.epoch,
                 }
                 for i in range(len(batch)):
                     entry["batch"] = i
