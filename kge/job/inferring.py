@@ -148,6 +148,8 @@ class InferringJob(Job):
             # 输出有 s, p, o, t, task(sp, po), split(test), filter([train,valid,test]),rank, rank_filtered
             if self.trace_examples:
                 entry = {
+                    "timestamp": "0",
+                    "entry_id": "0",
                     "type": "hidden_inference",
                     "scope": "example",
                     "split": self.infer_split,

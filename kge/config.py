@@ -417,8 +417,10 @@ class Config:
 
         Returns the written k/v pairs.
         """
-        kwargs["timestamp"] = time.time()
-        kwargs["entry_id"] = str(uuid.uuid4())
+        if 'timestamp' not in kwargs:
+            kwargs["timestamp"] = time.time()
+        if 'entry_id' not in kwargs:
+            kwargs["entry_id"] = str(uuid.uuid4())
         line = yaml.dump(kwargs, width=float("inf"), default_flow_style=True).strip()
         if echo or log:
             msg = yaml.dump(kwargs, default_flow_style=echo_flow)
