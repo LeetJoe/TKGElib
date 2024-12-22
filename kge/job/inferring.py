@@ -21,10 +21,11 @@ def _get_annotation_from_trace(exp_dir):
                     p = int(line_data['p'])
                     o = int(line_data['o'])
                     t = int(line_data['t'])
+                    task = line_data['task']
                     score = float(line_data['score'])
 
-                    fw.write('{}\t{}\t{}\t{}\t{}\n'.format(
-                        s, p, o, t, torch.sigmoid(torch.Tensor([score * 0.1])).item())
+                    fw.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                        s, p, o, t, task, torch.sigmoid(torch.Tensor([score * 0.1])).item())
                     )
             fw.close()
         fr.close()
