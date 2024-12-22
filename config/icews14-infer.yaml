@@ -12,6 +12,8 @@ eval:
   metrics_per:
     relation_type: true
   trace_level: example
+  num_workers: 6
+  pin_memory: true
 
 train:
   loss: kl
@@ -29,6 +31,8 @@ train:
     weight_decay: 0.01
     max_grad_norm: 1.0
   type: 1vsAll
+  num_workers: 6
+  pin_memory: true
 lookup_embedder:
   dim: 320
   dropout: 0.
@@ -57,3 +61,9 @@ valid:
       epochs: 50
       metric_value: 0.05
     patience: 50
+  num_workers: 6
+  pin_memory: true
+infer:
+  batch_size: 10240
+  num_workers: 6
+  pin_memory: true
