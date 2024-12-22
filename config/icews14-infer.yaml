@@ -19,7 +19,7 @@ train:
   loss: kl
   auto_correct: true
   batch_size: 1024
-  max_epochs: 100
+  max_epochs: 75
   lr_scheduler: "" #set empty here to use schedule below
   loss_arg: .nan # disable label smoothing
   optimizer: Adamax  # Adadelta
@@ -61,8 +61,6 @@ valid:
       epochs: 50
       metric_value: 0.05
     patience: 50
-  num_workers: 6
-  pin_memory: true
 infer:
   batch_size: 10240
   num_workers: 6
