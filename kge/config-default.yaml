@@ -437,7 +437,7 @@ infer:
   split: infer
 
   # Batch size used during evaluation
-  batch_size: 1024
+  batch_size: 10240
 
   # Amount of tracing information being written. When set to "example", traces
   # the rank of the correct answer for each example.
@@ -445,10 +445,10 @@ infer:
 
   # Number of workers used to construct batches. Leave at 0 for default (no
   # separate workers). On Windows, only 0 is supported.
-  num_workers: 0
+  num_workers: 6
 
   # Other options
-  pin_memory: False
+  pin_memory: True
 
 
 ## HYPERPARAMETER SEARCH #######################################################

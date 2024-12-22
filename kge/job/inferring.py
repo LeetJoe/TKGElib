@@ -145,7 +145,6 @@ class InferringJob(Job):
             # optionally: trace ranks of each example
             # 这个设置为 true 之后，所有的 query 的相关信息都会 trace 出来，在 eval job 里会执行，输出在 trace.yaml 文件里
             # 输出有 s, p, o, t, task(sp, po), split(test), filter([train,valid,test]),rank, rank_filtered
-            # todo: 还缺个 score
             if self.trace_examples:
                 entry = {
                     "type": "hidden_inference",
