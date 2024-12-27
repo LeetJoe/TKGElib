@@ -9,32 +9,6 @@ from kge import Config, Dataset
 from collections import defaultdict
 
 
-def _get_test_prediction_from_trace(job: Job, trace_entry):
-    exp_dir = job.config.folder
-    trace_file = os.path.join(exp_dir, 'trace.yaml')
-    save_file = os.path.join(exp_dir, 'pred_kge.tsv')
-
-    save_dict = {}
-    with open(trace_file, 'r') as fr:
-        with open(save_file, 'w') as fw:
-            for line in fr:
-                line_data = Job.trace_line_to_json(line)
-                if ('event' in line_data) and (line_data['event'] == 'example_rank'):
-                    s = int(line_data['s'])
-                    p = int(line_data['p'])
-                    o = int(line_data['o'])
-                    t = int(line_data['t'])
-                    task = line_data['task']
-                    rank = line_data['rank_filtered']
-                    candidates = line_data['candidates']
-
-                    fw.write('{}\t{}\t{}\t{}\t{}\t{}\n{}\n'.format(
-                        s, p, o, t, task, rank, candidates)
-                    )
-            fw.close()
-        fr.close()
-
-
 class EntityRankingJob(EvaluationJob):
     """ Entity ranking evaluation protocol """
 
@@ -47,7 +21,12 @@ class EntityRankingJob(EvaluationJob):
         self.tie_handling = self.config.get("eval.tie_handling")
 
         if self.config.get("eval.split") == 'test':
-            self.post_valid_hooks.append(_get_test_prediction_from_trace)
+            self.post_valid_hooks.append(
+                # _get_test_prediction_from_trace
+                _get_test_prediction
+            )
+
+        self.entry_list = []
 
         self.is_prepared = False
 
@@ -367,8 +346,9 @@ class EntityRankingJob(EvaluationJob):
             # 输出有 s, p, o, t, task(sp, po), split(test), filter([train,valid,test]),rank, rank_filtered
             if self.trace_examples:
                 entry = {
-                    "timestamp": 0,
-                    "entry_id": 0,
+                    # "timestamp": 0,
+                    # "entry_id": 0,
+
                     # "type": "entity_ranking",
                     # "scope": "example",
                     # "split": self.eval_split,
@@ -389,26 +369,40 @@ class EntityRankingJob(EvaluationJob):
                         entry["rank_filtered_with_test"] = (
                             o_ranks_filt_test[i].item() + 1
                         )
-                    self.trace(
-                        event="example_rank",
-                        task="sp",
-                        rank=o_ranks[i].item() + 1,
-                        rank_filtered=o_ranks_filt[i].item() + 1,
-                        candidates=self._candidates_to_str(batch_scores_sp[i]),
-                        **entry,
-                    )
+                    self.entry_list.append({
+                        "task": "sp",
+                        "rank": o_ranks[i].item() + 1,
+                        "rank_filtered": o_ranks_filt[i].item() + 1,
+                        "candidates": self._candidates_to_str(batch_scores_sp[i]),
+                        **entry
+                    })
+                    # self.trace(
+                    #     event="example_rank",
+                    #     task="sp",
+                    #     rank=o_ranks[i].item() + 1,
+                    #     rank_filtered=o_ranks_filt[i].item() + 1,
+                    #     candidates=self._candidates_to_str(batch_scores_sp[i]),
+                    #     **entry,
+                    # )
                     if filter_with_test:
                         entry["rank_filtered_with_test"] = (
                             s_ranks_filt_test[i].item() + 1
                         )
-                    self.trace(
-                        event="example_rank",
-                        task="po",
-                        rank=s_ranks[i].item() + 1,
-                        rank_filtered=s_ranks_filt[i].item() + 1,
-                        candidates=self._candidates_to_str(batch_scores_po[i]),
-                        **entry,
-                    )
+                    self.entry_list.append({
+                        "task": "po",
+                        "rank": s_ranks[i].item() + 1,
+                        "rank_filtered": s_ranks_filt[i].item() + 1,
+                        "candidates": self._candidates_to_str(batch_scores_po[i]),
+                        **entry
+                    })
+                    # self.trace(
+                    #     event="example_rank",
+                    #     task="po",
+                    #     rank=s_ranks[i].item() + 1,
+                    #     rank_filtered=s_ranks_filt[i].item() + 1,
+                    #     candidates=self._candidates_to_str(batch_scores_po[i]),
+                    #     **entry,
+                    # )
 
             # Compute the batch metrics for the full histogram (key "all")
             # batch_hists["all"].shape = [num_entities, ]，其中存放的是相应 rank 的计数，
@@ -713,3 +707,49 @@ num_ties for each true score.
             cand_str_list.append('{}*{:.6f}'.format(cand_pair_list[cidx][0], cand_pair_list[cidx][1]))
 
         return ';'.join(cand_str_list)
+
+
+def _get_test_prediction_from_trace(job: Job, trace_entry):
+    exp_dir = job.config.folder
+    trace_file = os.path.join(exp_dir, 'trace.yaml')
+    save_file = os.path.join(exp_dir, 'pred_kge.tsv')
+
+    save_dict = {}
+    with open(trace_file, 'r') as fr:
+        with open(save_file, 'w') as fw:
+            for line in fr:
+                line_data = Job.trace_line_to_json(line)
+                if ('event' in line_data) and (line_data['event'] == 'example_rank'):
+                    s = int(line_data['s'])
+                    p = int(line_data['p'])
+                    o = int(line_data['o'])
+                    t = int(line_data['t'])
+                    task = line_data['task']
+                    rank = line_data['rank_filtered']
+                    candidates = line_data['candidates']
+
+                    fw.write('{}\t{}\t{}\t{}\t{}\t{}\n{}\n'.format(
+                        s, p, o, t, task, rank, candidates)
+                    )
+            fw.close()
+        fr.close()
+
+
+def _get_test_prediction(job: EntityRankingJob, trace_entry):
+    exp_dir = job.config.folder
+    save_file = os.path.join(exp_dir, 'pred_kge_new.tsv')
+
+    with open(save_file, 'w') as fw:
+        for entry in job.entry_list:
+            s = int(entry['s'])
+            p = int(entry['p'])
+            o = int(entry['o'])
+            t = int(entry['t'])
+            task = entry['task']
+            rank = entry['rank_filtered']
+            candidates = entry['candidates']
+
+            fw.write('{}\t{}\t{}\t{}\t{}\t{}\n{}\n'.format(
+                s, p, o, t, task, rank, candidates)
+            )
+        fw.close()
