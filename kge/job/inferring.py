@@ -31,6 +31,24 @@ def _get_annotation_from_trace(exp_dir):
         fr.close()
 
 
+def _get_annotation(exp_dir, entry_list):
+    save_file = os.path.join(exp_dir, 'annotation.tsv')
+
+    with open(save_file, 'w') as fw:
+        for entry in entry_list:
+            s = int(entry['s'])
+            p = int(entry['p'])
+            o = int(entry['o'])
+            t = int(entry['t'])
+            task = entry['task']
+            score = float(entry['score'])
+
+            fw.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                s, p, o, t, task, torch.sigmoid(torch.Tensor([score * 0.1])).item())
+            )
+        fw.close()
+
+
 class InferringJob(Job):
     """ Entity ranking evaluation protocol """
 
@@ -70,6 +88,8 @@ class InferringJob(Job):
         self.post_infer_hooks = [
             self._save_annotation
         ]
+
+        self.entry_list = []
 
         self.is_prepared = False
 
@@ -148,8 +168,9 @@ class InferringJob(Job):
             # 输出有 s, p, o, t, task(sp, po), split(test), filter([train,valid,test]),rank, rank_filtered
             if self.trace_examples:
                 entry = {
-                    "timestamp": 0,
-                    "entry_id": 0,
+                    # "timestamp": 0,
+                    # "entry_id": 0,
+
                     # "type": "hidden_inference",
                     # "scope": "example",
                     # "split": self.infer_split,
@@ -165,18 +186,28 @@ class InferringJob(Job):
                         o[i].item(),
                         t[i].item(),
                     )
-                    self.trace(
-                        event="query_score",
-                        task="sp",
-                        score=o_true_scores[i].item(),
+                    self.entry_list.append({
+                        "task": "sp",
+                        "score": o_true_scores[i].item(),
                         **entry,
-                    )
-                    self.trace(
-                        event="query_score",
-                        task="po",
-                        score=s_true_scores[i].item(),
+                    })
+                    # self.trace(
+                    #     event="query_score",
+                    #     task="sp",
+                    #     score=o_true_scores[i].item(),
+                    #     **entry,
+                    # )
+                    self.entry_list.append({
+                        "task": "po",
+                        "score": s_true_scores[i].item(),
                         **entry,
-                    )
+                    })
+                    # self.trace(
+                    #     event="query_score",
+                    #     task="po",
+                    #     score=s_true_scores[i].item(),
+                    #     **entry,
+                    # )
 
             # optionally: trace batch metrics
             if self.trace_batch:  # 这里在配置文件里是 true —— 如果 trace level 是 example，这个就是 true。
@@ -231,7 +262,7 @@ class InferringJob(Job):
         # reset model and return metrics
         if was_training:
             self.model.train()  # todo: 这个操作是 reset model？？
-        # self.config.log("Finished inferring on " + self.infer_split + " split.")  # todo 这个要解除注释
+        self.config.log("Finished inferring on " + self.infer_split + " split.")
 
         for f in self.post_infer_hooks:
             f()
@@ -239,4 +270,5 @@ class InferringJob(Job):
         return trace_entry
 
     def _save_annotation(self):
-        _get_annotation_from_trace(self.config.folder)
+        # _get_annotation_from_trace(self.config.folder)
+        _get_annotation(self.config.folder, self.entry_list)
