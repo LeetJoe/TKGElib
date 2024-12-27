@@ -737,7 +737,7 @@ def _get_test_prediction_from_trace(job: Job, trace_entry):
 
 def _get_test_prediction(job: EntityRankingJob, trace_entry):
     exp_dir = job.config.folder
-    save_file = os.path.join(exp_dir, 'pred_kge_new.tsv')
+    save_file = os.path.join(exp_dir, 'pred_kge.tsv')
 
     with open(save_file, 'w') as fw:
         for entry in job.entry_list:
