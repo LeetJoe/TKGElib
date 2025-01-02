@@ -78,35 +78,31 @@ class EntityRankingJob(EvaluationJob):
         self.is_prepared = True
 
     def _collate(self, batch):
-
-        # todo !!!!! 这里注意 batch 格式，DataLoader 里输入的 dataset 是 shape=[n, 4] 的一个 tensor，但是 batch 并不是一个 shape
-        # todo =[b, 4] 的 tensor, 而是一个长度为 b 的 tuple，其中每一项是一个 shape=[4] 的 tensor
-
         """Looks up true triples for each triple in the batch"""
         # 从注释来看，这个 label_coords 的目的是为了找到在那些跟 batch 的 sp 或 po 相同的 facts，寻找范围依 filter 参数来确定。
         label_coords = []
         for split in self.filter_splits:
-            split_label_coords = kge.job.util.get_spt_pot_coords_from_spot_batch(  # todo indexing modified
-            # split_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(
+            # split_label_coords = kge.job.util.get_spt_pot_coords_from_spot_batch(  # todo indexing modified
+            split_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(
                 batch,
                 self.dataset.num_entities(),
-                self.dataset.index(f"{split}_spt_to_o"),  # todo indexing modified
-                self.dataset.index(f"{split}_pot_to_s"),  # todo indexing modified
-                # self.dataset.index(f"{split}_sp_to_o"),
-                # self.dataset.index(f"{split}_po_to_s"),
+                # self.dataset.index(f"{split}_spt_to_o"),  # todo indexing modified
+                # self.dataset.index(f"{split}_pot_to_s"),  # todo indexing modified
+                self.dataset.index(f"{split}_sp_to_o"),
+                self.dataset.index(f"{split}_po_to_s"),
             )
             label_coords.append(split_label_coords)
         label_coords = torch.cat(label_coords)
 
         if "test" not in self.filter_splits and self.filter_with_test:
-            test_label_coords = kge.job.util.get_spt_pot_coords_from_spot_batch(  # todo indexing modified
-            # test_label_coords = kge.job.util.get_spt_pot_coords_from_spot_batch(
+            # test_label_coords = kge.job.util.get_spt_pot_coords_from_spot_batch(  # todo indexing modified
+            test_label_coords = kge.job.util.get_sp_po_coords_from_spo_batch(
                 batch,
                 self.dataset.num_entities(),
-                self.dataset.index("test_spt_to_o"),  # todo indexing modified
-                self.dataset.index("test_pot_to_s"),  # todo indexing modified
-                # self.dataset.index("test_sp_to_o"),
-                # self.dataset.index("test_po_to_s"),
+                # self.dataset.index("test_spt_to_o"),  # todo indexing modified
+                # self.dataset.index("test_pot_to_s"),  # todo indexing modified
+                self.dataset.index("test_sp_to_o"),
+                self.dataset.index("test_po_to_s"),
             )
         else:
             test_label_coords = torch.zeros([0, 3], dtype=torch.long)
@@ -207,8 +203,8 @@ class EntityRankingJob(EvaluationJob):
                 chunk_size = self.dataset.num_entities()
 
             # for trace candidates' scores
-            batch_scores_sp = torch.zeros((len(batch),num_entities ), dtype=torch.float).to(self.device)
-            batch_scores_po = torch.zeros((len(batch),num_entities ), dtype=torch.float).to(self.device)
+            batch_scores_sp = torch.zeros((len(batch), num_entities), dtype=torch.float).to(self.device)
+            batch_scores_po = torch.zeros((len(batch), num_entities), dtype=torch.float).to(self.device)
 
             # process chunk by chunk
             # 这里 chunk 并不是对 batch 进行进一步的分批，而是在进行 _po/sp_ 预测的时候，对目标所属的 entities 集合进行
@@ -695,9 +691,8 @@ num_ties for each true score.
 
     def _candidates_to_str(self, batch_scores: torch.Tensor) -> str:
         values, indices = torch.sort(batch_scores, descending=True)
-        positive_mask = values > 0
-        values = torch.sigmoid(values[positive_mask] * 0.1).tolist()
-        indices = indices[positive_mask].tolist()
+        values = torch.sigmoid(values * 0.1).tolist()
+        indices = indices.tolist()
         cand_pair_list = []
         for cidx in range(len(indices)):
             cand_pair_list.append([indices[cidx], values[cidx]])
