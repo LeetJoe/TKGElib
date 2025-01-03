@@ -1143,7 +1143,7 @@ class TrainingJob1vsAll(TrainingJob):
         loss_value += loss_value_po.item()
         forward_time += time.time()
         backward_time -= time.time()
-        (loss_value_po + loss_value_sp).backward()  # todo sp 和 po 一起做的 backward()? 和分别做有什么区别？
+        (loss_value_po + loss_value_sp).backward()
         backward_time += time.time()
 
         # all done
