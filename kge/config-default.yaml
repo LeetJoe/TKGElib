@@ -98,7 +98,7 @@ dataset:
   # LibKGE will ensure that pickled files are only used when not outdated. Note
   # that the value specified here may be overwritten by dataset-specific choices
   # (in dataset.yaml).
-  pickle: True
+  pickle: False
 
   # Additional dataset specific keys can be added as needed
   +++: +++
