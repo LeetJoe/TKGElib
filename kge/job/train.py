@@ -67,10 +67,15 @@ class TrainingJob(Job):
         self.train_split = config.get("train.split")
 
         if config.exists("train.optimizer_args.schedule"):
-            config.set("train.optimizer_args.t_total",
-                    math.ceil(self.dataset.split(self.train_split).size(0)
-                                / self.batch_size) * config.get("train.max_epochs"),
-                    create=True, log=True)
+            # config.set("train.optimizer_args.t_total",
+            #         math.ceil(self.dataset.split(self.train_split).size(0)
+            #                     / self.batch_size) * config.get("train.max_epochs"),
+            #         create=True, log=True)
+            if not config.exists("train.optimizer_args.t_total"):
+                config.set("train.optimizer_args.t_total",
+                        math.ceil(self.dataset.split(self.train_split).size(0)*1.5
+                                    / self.batch_size) * config.get("train.max_epochs"),
+                        create=True, log=True)
         self.optimizer = KgeOptimizer.create(config, self.model)
         self.kge_lr_scheduler = KgeLRScheduler(config, self.optimizer)
 
@@ -167,6 +172,9 @@ class TrainingJob(Job):
                     range(len(self.valid_trace)),
                     key=lambda index: self.valid_trace[index][metric_name],
                 )
+
+                if self.epoch > 0 and self.epoch % 100 == 0:
+                    self.save(self.config.checkpoint_file(str(self.epoch) + "_keep"))
 
                 # len(self.valid_trace) 是已经完成的 valid 次数，len(self.valid_trace) - 1 就是上一次 valid 记录的下标（从 0 开始计）。
                 if best_index == len(self.valid_trace) - 1:
