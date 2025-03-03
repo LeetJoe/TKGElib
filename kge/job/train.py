@@ -71,9 +71,10 @@ class TrainingJob(Job):
             #         math.ceil(self.dataset.split(self.train_split).size(0)
             #                     / self.batch_size) * config.get("train.max_epochs"),
             #         create=True, log=True)
+            data_size_scale = 1
             if not config.exists("train.optimizer_args.t_total"):
                 config.set("train.optimizer_args.t_total",
-                        math.ceil(self.dataset.split(self.train_split).size(0)*1.5
+                        math.ceil(self.dataset.split(self.train_split).size(0) * data_size_scale
                                     / self.batch_size) * config.get("train.max_epochs"),
                         create=True, log=True)
         self.optimizer = KgeOptimizer.create(config, self.model)
@@ -218,7 +219,7 @@ class TrainingJob(Job):
             self.epoch += 1
             self.config.log("Starting epoch {}...".format(self.epoch))
             # 这个 trace_entry 是训练的一些 log 信息，也就是 trace 本来的字面含义
-            trace_entry = self.run_epoch()   # 这里就是训练入口，返回就训练完成了。 好简洁！！
+            trace_entry = self.run_epoch()   # 这里就是训练入口，返回就训练完成了。
             for f in self.post_epoch_hooks:  # todo 这个好像是空的，没看到有重载或者赋值的代码。
                 f(self, trace_entry)
             self.config.log("Finished epoch {}.".format(self.epoch))
@@ -312,7 +313,7 @@ class TrainingJob(Job):
             "valid_trace": self.valid_trace,
             "model": self.model.save(),  # 这个使用的是 KgeModel 里的 save，eceformer 没有重载，返回的是模型参数
             "optimizer_state_dict": self.optimizer.state_dict(),
-            "lr_scheduler_state_dict": self.kge_lr_scheduler.state_dict(),  # todo 这个 lr_scheduler 是个什么东西？
+            "lr_scheduler_state_dict": self.kge_lr_scheduler.state_dict(),
             "job_id": self.job_id,
         }
         train_checkpoint = self.config.save_to(train_checkpoint)  # 这个就是把 config 自己加到 train_checkpoint 中
