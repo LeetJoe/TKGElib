@@ -53,7 +53,7 @@ class ECEformerScorer(RelationalScorer):
             # channel_dim=self.get_option("ff_dim"),
             dropout=self.get_option("attn_dropout")
         )
-        
+
         self.glb_avg_pooling = nn.AdaptiveAvgPool1d(1)
 
         # self.transformer_encoder = rat.Encoder(
