@@ -15,6 +15,7 @@ from kge.job import Job
 from kge.model import KgeModel
 
 from kge.util import KgeLoss, KgeOptimizer, KgeSampler, KgeLRScheduler
+from kge.util.sc import set_seed
 from typing import Any, Callable, Dict, List, Optional, Union
 import kge.job.util
 
@@ -31,8 +32,9 @@ def _generate_worker_init_fn(config):
         if use_fixed_seed:
             # reseed based on current seed (same for all workers) and worker number
             # (different)
-            base_seed = np.random.randint(2 ** 32 - 1)
-            np.random.seed(base_seed + worker_num)
+            # base_seed = np.random.randint(2 ** 32 - 1)
+            # np.random.seed(base_seed + worker_num)
+            set_seed(config.get("random_seed.numpy"))
         else:
             # reseed fresh
             np.random.seed()
@@ -651,7 +653,7 @@ class TrainingJobKvsAll(TrainingJob):
         self.loader = torch.utils.data.DataLoader(
             range(self.num_examples),
             collate_fn=self._get_collate_fun(),
-            shuffle=True,
+            shuffle=False,  # todo
             batch_size=self.batch_size,
             num_workers=self.config.get("train.num_workers"),
             worker_init_fn=_generate_worker_init_fn(self.config),
@@ -859,7 +861,7 @@ class TrainingJobNegativeSampling(TrainingJob):
         self.loader = torch.utils.data.DataLoader(
             range(self.num_examples),
             collate_fn=self._get_collate_fun(),
-            shuffle=True,
+            shuffle=False,
             batch_size=self.batch_size,
             num_workers=self.config.get("train.num_workers"),
             worker_init_fn=_generate_worker_init_fn(self.config),
@@ -1115,7 +1117,7 @@ class TrainingJob1vsAll(TrainingJob):
             collate_fn=lambda batch: {
                 "triples": self.dataset.split(self.train_split)[batch, :].long()
             },
-            shuffle=True,
+            shuffle=False,
             batch_size=self.batch_size,
             num_workers=self.config.get("train.num_workers"),
             worker_init_fn=_generate_worker_init_fn(self.config),

@@ -5,6 +5,8 @@ import numpy as np
 import networkx as nx
 
 
+rng_seed = 1234  # None
+
 def _group_by(keys, values) -> dict:
     """Group values by keys.
 
@@ -138,7 +140,7 @@ def index_neighbor_multidig(dataset):
         neighbor_edge_types_all = [[] for _ in range(dataset.num_entities())]
         neighbor_edge_times_all = [[] for _ in range(dataset.num_entities())]
 
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(rng_seed)
 
         for s, o, data in edges_attributes:
             neighbor_all[s].append(o)
@@ -181,7 +183,7 @@ def index_neighbor_dig(dataset):
         max_neighbor_num = 300
         all_neighbor = torch.zeros((dataset.num_entities(), 3, max_neighbor_num), dtype=torch.long)
         all_neighbor_num = torch.zeros(dataset.num_entities(), dtype=torch.long)
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(rng_seed)
         for s in range(dataset.num_entities()):
             if s not in G:
                 continue
