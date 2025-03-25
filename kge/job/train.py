@@ -653,7 +653,7 @@ class TrainingJobKvsAll(TrainingJob):
         self.loader = torch.utils.data.DataLoader(
             range(self.num_examples),
             collate_fn=self._get_collate_fun(),
-            shuffle=False,  # todo
+            shuffle=True,  # todo
             batch_size=self.batch_size,
             num_workers=self.config.get("train.num_workers"),
             worker_init_fn=_generate_worker_init_fn(self.config),
@@ -861,7 +861,7 @@ class TrainingJobNegativeSampling(TrainingJob):
         self.loader = torch.utils.data.DataLoader(
             range(self.num_examples),
             collate_fn=self._get_collate_fun(),
-            shuffle=False,
+            shuffle=True,
             batch_size=self.batch_size,
             num_workers=self.config.get("train.num_workers"),
             worker_init_fn=_generate_worker_init_fn(self.config),
@@ -1117,7 +1117,7 @@ class TrainingJob1vsAll(TrainingJob):
             collate_fn=lambda batch: {
                 "triples": self.dataset.split(self.train_split)[batch, :].long()
             },
-            shuffle=False,
+            shuffle=True,
             batch_size=self.batch_size,
             num_workers=self.config.get("train.num_workers"),
             worker_init_fn=_generate_worker_init_fn(self.config),
