@@ -2,6 +2,7 @@
 Assorted utilities for working with neural networks by Sanxing Chen (sc3hn@virginia.edu)
 """
 
+import os
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -36,7 +37,34 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    # ^^ safe to call this function even if cuda is not available
+
+
+def set_seed_from_env():
+    seed_default = int(os.environ.get("TKGE_SEED", -1))
+    seed_python = int(os.environ.get("TKGE_SEED_PYTHON", -1))
+    seed_numpy = int(os.environ.get("TKGE_SEED_NUMPY", -1))
+    seed_torch = int(os.environ.get("TKGE_SEED_TORCH", -1))
+    seed_cuda = int(os.environ.get("TKGE_SEED_CUDA", -1))
+    if seed_default < 0:
+        seed_default = random.randint(0, 10000)
+    if seed_python >= 0:
+        random.seed(seed_python)
+    else:
+        random.seed(seed_default)
+    if seed_numpy >= 0:
+        np.random.seed(seed_numpy)
+    else:
+        np.random.seed(seed_default)
+    if seed_torch >= 0:
+        torch.manual_seed(seed_torch)
+    else:
+        torch.manual_seed(seed_default)
+    if seed_cuda >= 0:
+        torch.cuda.manual_seed(seed_cuda)
+        torch.cuda.manual_seed_all(seed_cuda)
+    else:
+        torch.cuda.manual_seed(seed_default)
+        torch.cuda.manual_seed_all(seed_default)
 
 
 def pad_seq_of_seq(

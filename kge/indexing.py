@@ -1,12 +1,14 @@
+import os
 import torch
 from collections import defaultdict, OrderedDict
 import numba
 import numpy as np
 import networkx as nx
 
-
-rng_seed = 1234  # None
-# rng_seed = None
+# todo seed
+rng_seed = int(os.environ.get("TKGE_RNG_SEED", -1))
+if rng_seed == -1:
+    rng_seed = None
 
 def _group_by(keys, values) -> dict:
     """Group values by keys.

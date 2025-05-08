@@ -15,7 +15,7 @@ from kge.job import Job
 from kge.model import KgeModel
 
 from kge.util import KgeLoss, KgeOptimizer, KgeSampler, KgeLRScheduler
-from kge.util.sc import set_seed
+from kge.util.sc import set_seed, set_seed_from_env
 from typing import Any, Callable, Dict, List, Optional, Union
 import kge.job.util
 
@@ -32,9 +32,11 @@ def _generate_worker_init_fn(config):
         if use_fixed_seed:
             # reseed based on current seed (same for all workers) and worker number
             # (different)
+            # todo seed
             # base_seed = np.random.randint(2 ** 32 - 1)
             # np.random.seed(base_seed + worker_num)
-            set_seed(config.get("random_seed.numpy"))
+            # set_seed(config.get("random_seed.numpy"))
+            set_seed_from_env()
         else:
             # reseed fresh
             np.random.seed()

@@ -10,7 +10,7 @@ from kge import Dataset
 from kge import Config
 from kge.job import Job
 from kge.misc import get_git_revision_short_hash, kge_base_dir, is_number
-from kge.util.sc import set_seed
+from kge.util.sc import set_seed, set_seed_from_env
 from kge.util.dump import add_dump_parsers, dump
 from kge.util.io import get_checkpoint_file, load_checkpoint
 from kge.util.package import package_model, add_package_parser
@@ -282,8 +282,9 @@ def main():
 
             torch.manual_seed(config.get("random_seed.torch"))
 
-            # todo
-            set_seed(config.get("random_seed.torch"))
+            # todo seed
+            # set_seed(config.get("random_seed.torch"))
+            set_seed_from_env()
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
             torch.backends.cudnn.enabled = False
