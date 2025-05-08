@@ -110,7 +110,7 @@ class Dataset(Configurable):
             folder = os.path.join(cur_base_dir(), "data", name)
         if os.path.isfile(os.path.join(folder, "dataset.yaml")):
             # 这个 dataset.yaml 跟配置文件里的 yaml 没有关系，它是在 preprocess 的时候生成的，里面记录了数据集的基本情况
-            config.log("Loading configuration of dataset " + name + "...")
+            config.log("Loading configuration of dataset " + name + "(dir: " + folder + ")" + "...")
             config.load(os.path.join(folder, "dataset.yaml"))
 
         # 实例化

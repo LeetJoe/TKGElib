@@ -6,6 +6,7 @@ import networkx as nx
 
 
 rng_seed = 1234  # None
+# rng_seed = None
 
 def _group_by(keys, values) -> dict:
     """Group values by keys.

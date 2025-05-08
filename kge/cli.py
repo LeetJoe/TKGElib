@@ -10,10 +10,15 @@ from kge import Dataset
 from kge import Config
 from kge.job import Job
 from kge.misc import get_git_revision_short_hash, kge_base_dir, is_number
+from kge.util.sc import set_seed
 from kge.util.dump import add_dump_parsers, dump
 from kge.util.io import get_checkpoint_file, load_checkpoint
 from kge.util.package import package_model, add_package_parser
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6'
+
+import pydevd
+
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3,4'
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 def argparse_bool_type(v):
@@ -144,6 +149,9 @@ def create_parser(config, additional_args=[]):
 
 
 def main():
+    # 远程主机的 IP 地址和端口
+    # pydevd.settrace('10.5.36.157', port=11988, stdoutToServer=True, stderrToServer=True)
+
     # default config
     config = Config()
 
@@ -273,6 +281,13 @@ def main():
             import torch
 
             torch.manual_seed(config.get("random_seed.torch"))
+
+            # todo
+            set_seed(config.get("random_seed.torch"))
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            torch.backends.cudnn.enabled = False
+
         if config.get("random_seed.numpy") > -1:
             import numpy.random
 
