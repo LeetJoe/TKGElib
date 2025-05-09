@@ -6,7 +6,7 @@ import numpy as np
 import networkx as nx
 
 # todo seed
-rng_seed = int(os.environ.get("TKGE_RNG_SEED", -1))
+rng_seed = int(os.environ.get("TKGE_SEED_NUMPY_RNG", -1))
 if rng_seed == -1:
     rng_seed = None
 
