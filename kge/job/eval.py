@@ -59,7 +59,7 @@ class EvaluationJob(Job):
         #: Hooks after computing the ranks for each batch entry.
         #: Signature: job, trace_entry
         self.hist_hooks = [hist_all]
-        if config.get("eval.metrics_per.relation_type"):
+        if config.get("eval.metrics_per.relation_type"):  # 这个在默认配置文件里是 False, 在 icews14-best 里是 True
             self.hist_hooks.append(hist_per_relation_type)
         if config.get("eval.metrics_per.argument_frequency"):
             self.hist_hooks.append(hist_per_frequency_percentile)
@@ -72,10 +72,11 @@ class EvaluationJob(Job):
     @staticmethod
     def create(config, dataset, parent_job=None, model=None):
         """Factory method to create an evaluation job """
-        from kge.job import EntityRankingJob, EntityPairRankingJob
+        from kge.job import EntityRankingJob, EntityPairRankingJob  # 在这里执行 import，有意思，应该能提升性能吧。
 
         # create the job
-        if config.get("eval.type") == "entity_ranking":
+        # 下面的 EntityRankingJob 和 EntityPairRankingJob 都继承自 EvaluationJob
+        if config.get("eval.type") == "entity_ranking":  # 配置里使用的是这个
             return EntityRankingJob(config, dataset, parent_job=parent_job, model=model)
         elif config.get("eval.type") == "entity_pair_ranking":
             return EntityPairRankingJob(
@@ -162,6 +163,7 @@ def hist_all(hists, s, p, o, s_ranks, o_ranks, job, **kwargs):
 
     hist = hists["all"]
     for r in o_ranks:
+        # 这个 r 是 batch 中对应位置的 query 的 rank, 也就是说 hist 里保存的是 rank 的计数
         hist[r] += 1
         if job.head_and_tail:
             hist_tail[r] += 1
@@ -173,18 +175,20 @@ def hist_all(hists, s, p, o, s_ranks, o_ranks, job, **kwargs):
 
 def hist_per_relation_type(hists, s, p, o, s_ranks, o_ranks, job, **kwargs):
     for rel_type, rels in job.dataset.index("relations_per_type").items():
+        # rel_type 就是 1/M-1/N 标记，rels 是 set of rels
         __initialize_hist(hists, rel_type, job)
         hist = hists[rel_type]
-        if job.head_and_tail:
+        if job.head_and_tail:  # default False
             __initialize_hist(hists, f"{rel_type}_head", job)
             __initialize_hist(hists, f"{rel_type}_tail", job)
             hist_head = hists[f"{rel_type}_head"]
             hist_tail = hists[f"{rel_type}_tail"]
 
-        mask = [_p in rels for _p in p.tolist()]
+        mask = [_p in rels for _p in p.tolist()]  # p 中类型属于当前 rel_type 的 rel 的 mask
+        # zip 返回的是 items(), 其中 item[0], item[1] 分别是传入的两个参数的相应 item。
         for r, m in zip(o_ranks, mask):
             if m:
-                hists[rel_type][r] += 1
+                hists[rel_type][r] += 1  # todo: 跟前面 all 的统计一样，这里只计数 rank 出现的次数而不管 rank 值
                 if job.head_and_tail:
                     hist_tail[r] += 1
 

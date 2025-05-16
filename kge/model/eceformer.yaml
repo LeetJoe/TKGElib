@@ -21,7 +21,7 @@ eceformer:
   add_mlm_loss: true
   activation: relu
   max_context_size: 0
-  similarity: DotProduct
+  similarity: Bilinear # DotProduct
   initializer_range: 0.02 # transformer Linear and Embedding weight normal distribution std
   class_name: ECEformer
   entity_embedder:

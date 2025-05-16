@@ -6,6 +6,8 @@ import uuid
 
 from kge.misc import get_git_revision_short_hash
 import os
+import re
+import json
 import socket
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -37,6 +39,8 @@ def _save_job_config(job: "Job"):
 class Job:
     # Hooks run after job creation has finished
     # signature: job
+
+    # 这个在各类 train jobs 和 evaluation job 里都会使用
     job_created_hooks: List[Callable[["Job"], Any]] = [
         _trace_job_creation,
         _save_job_config,
@@ -62,8 +66,8 @@ class Job:
     def create(
         config: Config, dataset: Optional[Dataset] = None, parent_job=None, model=None
     ):
-        "Create a new job."
-        from kge.job import TrainingJob, EvaluationJob, SearchJob
+        """Create a new job."""
+        from kge.job import TrainingJob, EvaluationJob, InferringJob, SearchJob
 
         if dataset is None:
             dataset = Dataset.create(config)
@@ -77,6 +81,10 @@ class Job:
             return SearchJob.create(config, dataset, parent_job=parent_job)
         elif job_type == "eval":
             return EvaluationJob.create(
+                config, dataset, parent_job=parent_job, model=model
+            )
+        elif job_type == "infer":
+            return InferringJob(
                 config, dataset, parent_job=parent_job, model=model
             )
         else:
@@ -145,3 +153,21 @@ class Job:
         return self.config.trace(
             job_id=self.job_id, job=self.config.get("job.type"), **kwargs
         )
+
+    @staticmethod
+    def trace_line_to_json(line: str):
+        line = re.sub('\s', '', line)
+        line = re.sub(',', '\",\"', line)
+        line = re.sub(':', '\":\"', line)
+        line = re.sub('{}', '', line)
+        line = re.sub('\[\]', '', line)
+        line = re.sub('\"\[', '[\"', line)
+        line = re.sub('\]\"', '\"]', line)
+        line = re.sub('{', '{\"', line)
+        line = re.sub('}', '\"}', line)
+        try:
+            line_data = json.loads(line)
+        except Exception as e:
+            line_data = {}
+
+        return line_data

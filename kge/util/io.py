@@ -17,7 +17,7 @@ def get_checkpoint_file(config: Config, checkpoint_argument: str = "default"):
         path to a checkpoint file
     """
     if checkpoint_argument == "default":
-        if config.get("job.type") in ["eval", "valid"]:
+        if config.get("job.type") in ["eval", "valid", "infer"]:
             checkpoint_file = config.checkpoint_file("best")
         else:
             last_epoch = config.last_checkpoint_number()

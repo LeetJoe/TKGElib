@@ -23,7 +23,8 @@ First download the standard benchmark datasets. The Data folder can be downloade
 cd data
 # for GDELT/ICEWS14/ICEWS05-15/ICEWS18
 # e.g. python preprocess.py icews14
-python preprocess.py $dataset_name
+python preprocess.py $dataset_name --init  # for train, valid, test, and 'found' merge
+python preprocess.py $dataset_name  # for infer
 # for YAGO11k and WikiData12k
 python preprocess_intravel.py $dataset_name
 ```
@@ -34,6 +35,8 @@ Configurations for the experiments are in the `/config` folder.
 
 ``` sh
 python -m kge start config/gdelt-best.yaml
+
+python -m kge resume <saved_dir>
 ```
 
 The training process uses DataParallel in all visible GPUs by default, which can be overrode by appending `--job.device cpu` to the command above.
@@ -45,6 +48,7 @@ You can evaluate the trained models on dev/test set using the following commands
 ``` sh
 python -m kge eval <saved_dir>
 python -m kge test <saved_dir>
+python -m kge infer <saved_dir>
 ```
 
 ## Acknowledgment

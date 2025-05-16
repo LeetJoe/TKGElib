@@ -1,9 +1,14 @@
+import os
 import torch
 from collections import defaultdict, OrderedDict
 import numba
 import numpy as np
 import networkx as nx
 
+# todo seed
+rng_seed = int(os.environ.get("TKGE_SEED_NUMPY_RNG", -1))
+if rng_seed == -1:
+    rng_seed = None
 
 def _group_by(keys, values) -> dict:
     """Group values by keys.
@@ -22,6 +27,7 @@ def _group_by(keys, values) -> dict:
     return OrderedDict(result)
 
 
+# 把 split 里的数据按 key 指定的模式包装成 {(s, p): [o1, o2, ...]} 这样的形式，根据 key in {sp, po, so} 不同有不同的组织结果
 def index_KvsAll(dataset: "Dataset", split: str, key: str):
     """Return an index for the triples in split (''train'', ''valid'', ''test'')
     from the specified key (''sp'' or ''po'' or ''so'') to the indexes of the
@@ -137,7 +143,7 @@ def index_neighbor_multidig(dataset):
         neighbor_edge_types_all = [[] for _ in range(dataset.num_entities())]
         neighbor_edge_times_all = [[] for _ in range(dataset.num_entities())]
 
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(rng_seed)
 
         for s, o, data in edges_attributes:
             neighbor_all[s].append(o)
@@ -180,7 +186,7 @@ def index_neighbor_dig(dataset):
         max_neighbor_num = 300
         all_neighbor = torch.zeros((dataset.num_entities(), 3, max_neighbor_num), dtype=torch.long)
         all_neighbor_num = torch.zeros(dataset.num_entities(), dtype=torch.long)
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(rng_seed)
         for s in range(dataset.num_entities()):
             if s not in G:
                 continue
@@ -208,6 +214,7 @@ def index_neighbor_dig(dataset):
     return dataset._indexes.get(name)
 
 
+# 这个得到的是 rel id 作为下标的，所有的 1/M-1/N 的标记，记为 relation_types
 def index_relation_types(dataset):
     """Classify relations into 1-N, M-1, 1-1, M-N.
 
@@ -225,16 +232,24 @@ def index_relation_types(dataset):
             (dataset.index("train_sp_to_o"), 1),
             (dataset.index("train_po_to_s"), 0),
         ]:
+            # index train_xx_to_x 对应的 index，p 是 1 或者 0: 这样 prefix[p] 取到的就是其中的 predicates 了
             for prefix, labels in index.items():
+                # prefix 是 (s, p) 或 (p, o)，labels 是对应的 [o] 或 [s]
+                # p 为 0 时，第二个坐标是 0；p 为 1 时，第二个坐标是 2: 刚好对应于 index 的 target/direction 的位置
                 relation_stats[prefix[p], 0 + p * 2] = relation_stats[
                     prefix[p], 0 + p * 2
                 ] + len(labels)
                 relation_stats[prefix[p], 1 + p * 2] = (
                     relation_stats[prefix[p], 1 + p * 2] + 1.0
                 )
-        relation_stats[:, 4] = (relation_stats[:, 0] / relation_stats[:, 1]) > 1.5
-        relation_stats[:, 5] = (relation_stats[:, 2] / relation_stats[:, 3]) > 1.5
+        # relation_stats 的第一个下标表示的是 relation id，第二个下标是一个 6 元组，其中第一个位置是 rel 作为 po_s 时，s 的总计数；
+        # 第二个位置是 rel 作为 po_s 时，rel 出现的次数；第三个位置是 rel 作为 sp_o 时，o 的总计数；第四个位置是 rel 作为 sp_o 时，rel
+        # 出现的次数。
+        relation_stats[:, 4] = (relation_stats[:, 0] / relation_stats[:, 1]) > 1.5  # po_s 时，num_s/p 超过 1.5
+        relation_stats[:, 5] = (relation_stats[:, 2] / relation_stats[:, 3]) > 1.5  # sp_o 时，num_o/p 超过 1.5
         relation_types = []
+        # 如果 rel 相关的 head 平均数量超过 1.5 就记为 M，否则就记为 1; 相关的 tail 平均数量超过 1.5 就记为 N，否则就记为 1；
+        # 最终根据上面的标记，得到 rel 的分类为：M-N, 1-N, M-1, 1-1。
         for i in range(dataset.num_relations()):
             relation_types.append(
                 "{}-{}".format(
@@ -248,6 +263,7 @@ def index_relation_types(dataset):
     return dataset._indexes["relation_types"]
 
 
+# 这里按 rel type 1/M-1/N 组织 rel id set()
 def index_relations_per_type(dataset):
     if "relations_per_type" not in dataset._indexes:
         relations_per_type = {}
@@ -357,6 +373,7 @@ def create_default_index_functions(dataset: "Dataset"):
     for split in dataset.files_of_type("triples"):
         for key, value in [("sp", "o"), ("po", "s"), ("so", "p"), ("spt", "o"), ("pot", "s"), ("sot", "p")]:
             # self assignment needed to capture the loop var
+            # IndexWrapper 这个方法类似 map() 函数，把后面的数据应用到第一个参数指定的函数里处理
             dataset.index_functions[f"{split}_{key}_to_{value}"] = IndexWrapper(
                 index_KvsAll, split=split, key=key
             )

@@ -114,41 +114,41 @@ class RelationalScorer(KgeBase):
 
         The embeddings are combined row-wise. The output is a :math`n\times 1` tensor,
         in which the :math:`i`-th entry holds the score of the embedding triple
-        :math:`(s_i, p_i, o_i)`.
+        :math:`(s_i, p_i, o_i, t_i)`.
 
         """
         return self.score_emb(s_emb, p_emb, o_emb, t_emb, "spo")
 
     def score_emb(
-        self, s_emb: Tensor, p_emb: Tensor, o_emb, t_emb: Tensor, combine: str
+        self, s_emb: Tensor, p_emb: Tensor, o_emb: Tensor, t_emb: Tensor, combine: str
     ) -> Tensor:
         r"""Scores a set of triples specified by their embeddings.
 
-        `s_emb`, `p_emb`, and `o_emb` are tensors of size :math:`n_s\times d_e`,
-        :math:`n_p\times d_r`, and :math:`n_o\times d_e`, where :math:`d_e` and
-        :math:`d_r` are the sizes of the entity and relation embeddings, respectively.
+        `s_emb`, `p_emb`, `o_emb` and `t_emb` are tensors of size :math:`n_s\times d_e`,
+        :math:`n_p\times d_r`, :math:`n_o\times d_e` and :math:`n_t\times d_t`, where :math:`d_e`,
+        :math:`d_r` and :math:`d_t` are the sizes of the entity, relation and time embeddings, respectively.
 
         The provided embeddings are combined based on the value of `combine`. Common
         values are :code:`"spo"`, :code:`"sp_"`, and :code:`"_po"`. Not all models may
         support all combinations.
 
         When `combine` is :code:`"spo"`, then embeddings are combined row-wise. In this
-        case, it is required that :math:`n_s=n_p=n_o=n`. The output is identical to
-        :func:`~RelationalScorer.score_emb_spo`, i.e., a :math`n\times 1` tensor, in
+        case, it is required that :math:`n_s=n_p=n_o=n_t=n`. The output is identical to
+        :func:`~RelationalScorer.score_emb_spo`, i.e., a :math:`n\times 1` tensor, in
         which the :math:`i`-th entry holds the score of the embedding triple
-        :math:`(s_i, p_i, o_i)`.
+        :math:`(s_i, p_i, o_i, t_i)`.
 
         When `combine` is :code:`"sp_"`, the subjects and predicates are taken row-wise
         and subsequently combined with all objects. In this case, it is required that
-        :math:`n_s=n_p=n`. The output is a :math`n\times n_o` tensor, in which the
+        :math:`n_s=n_p=n_t=n`. The output is a :math:`n\times n_o` tensor, in which the
         :math:`(i,j)`-th entry holds the score of the embedding triple :math:`(s_i, p_i,
-        o_j)`.
+        o_j, t_i)`.
 
         When `combine` is :code:`"_po"`, predicates and objects are taken row-wise and
         subsequently combined with all subjects. In this case, it is required that
-        :math:`n_p=n_o=n`. The output is a :math`n\times n_s` tensor, in which the
+        :math:`n_p=n_o=n_t=n`. The output is a :math:`n\times n_s` tensor, in which the
         :math:`(i,j)`-th entry holds the score of the embedding triple :math:`(s_j, p_i,
-        o_i)`.
+        o_i, t_i)`.
 
         """
         n = p_emb.size(0)
@@ -460,14 +460,16 @@ class KgeModel(KgeBase):
         return model
 
     def prepare_job(self, job: "Job", **kwargs):
-        super().prepare_job(job, **kwargs)
+        super().prepare_job(job, **kwargs)  # 超类里的 prepare_job 是空的，下面这几个 embedder 都实例化自同一个类 KgeEmbedder，它们的 prepare_job 看起来都是空的。
         self._entity_embedder.prepare_job(job, **kwargs)
         self._relation_embedder.prepare_job(job, **kwargs)
         self._time_embedder.prepare_job(job, **kwargs)
 
         def append_num_parameter(job, trace):
+            # p.numel() 用于计算 tensor p 的参数量，比如它是一个 [2,3,4] 的矩阵，那么 p.numel() = 2*3*4 = 24
             trace["num_parameters"] = sum(map(lambda p: p.numel(), self.parameters()))
 
+        # 这个就是添加了一个 trace 的记录点，看起来并不重要。
         job.post_epoch_trace_hooks.append(append_num_parameter)
 
     def penalty(self, **kwargs) -> List[Tensor]:
@@ -504,14 +506,19 @@ class KgeModel(KgeBase):
 
     def get_scorer(self) -> RelationalScorer:
         return self._scorer
-    
+
+    # 调用入口
     def forward(self, fn_name, *args, **kwargs):
+        # 这个相当于调用 fn_name 的值所指定的方法，后面是参数
         return getattr(self, fn_name)(*args, **kwargs)
 
-    def score_spo(self, s: Tensor, p: Tensor, o: Tensor, t:Tensor, direction=None) -> Tensor:
+    # 这个返回的结果只有一个，就是针对 (s, p, o, t) 进行的打分，可以根据 (s, p, t) 对 o 打分，也可以根据 (p, o, t) 对 s 打分，
+    # 因此没有“候选”一说，分数只有一个
+    def score_spo(self, s: Tensor, p: Tensor, o: Tensor, t: Tensor, direction=None) -> Tensor:
+        # 这里出现的 :math:`` 相当于 markdown, 可以格式化为数学公式输出，鼠标放在函数名上等一会儿就能看到弹出来的效果
         r"""Compute scores for a set of triples.
 
-        `s`, `p`, and `o` are vectors of common size :math:`n`, holding the indexes of
+        `s`, `p`, `o`, and `t` are vectors of common size :math:`n`, holding the indexes of
         the subjects, relations, and objects to score.
 
         `direction` may influence how scores are computed. For most models, this setting
@@ -519,7 +526,7 @@ class KgeModel(KgeBase):
         `"o"` (depending on what is predicted).
 
         Returns a vector of size :math:`n`, in which the :math:`i`-th entry holds the
-        score of triple :math:`(s_i, p_i, o_i)`.
+        score of triple :math:`(s_i, p_i, t_i, o_i)`.
 
         """
         s = self.get_s_embedder().embed(s)
@@ -528,17 +535,22 @@ class KgeModel(KgeBase):
         t = self.get_t_embedder().embed(t)
         return self._scorer.score_emb(s, p, o, t, combine="spo").view(-1)
 
+
+    # 这里默认不给 o，对 (s, p, t) 关于 o 进行预测，结果是一系列候选及相应的分数；如果 o 给出的话，相当于对候选进行限定，仅对 o 中给出的
+    # 候选进行打分。
     def score_sp(self, s: Tensor, p: Tensor, t: Tensor, o: Tensor = None) -> Tensor:
         r"""Compute scores for triples formed from a set of sp-pairs and all (or a subset of the) objects.
 
-        `s` and `p` are vectors of common size :math:`n`, holding the indexes of the
+        `s`, `p` and `o` are vectors of common size :math:`n`, holding the indexes of the
         subjects and relations to score.
 
         Returns an :math:`n\times E` tensor, where :math:`E` is the total number of
         known entities. The :math:`(i,j)`-entry holds the score for triple :math:`(s_i,
-        p_i, j)`.
+        p_i, j, t_i)`. （这里的意思是 j 就是一个 object id，而不是某个列表的下标？）
 
         If `o` is not None, it is a vector holding the indexes of the objects to score.
+
+        “如果 `o` 不是 None，则 `o[i]` 是一个 objects 列表，限定只对这些候选进行打分。”
 
         """
         s = self.get_s_embedder().embed(s)
@@ -554,12 +566,12 @@ class KgeModel(KgeBase):
     def score_po(self, p: Tensor, o: Tensor, t: Tensor, s: Tensor = None) -> Tensor:
         r"""Compute scores for triples formed from a set of po-pairs and (or a subset of the) subjects.
 
-        `p` and `o` are vectors of common size :math:`n`, holding the indexes of the
+        `p`, `o` and `t` are vectors of common size :math:`n`, holding the indexes of the
         relations and objects to score.
 
         Returns an :math:`n\times E` tensor, where :math:`E` is the total number of
         known entities. The :math:`(i,j)`-entry holds the score for triple :math:`(j,
-        p_i, o_i)`.
+        p_i, o_i, t_i)`.
 
         If `s` is not None, it is a vector holding the indexes of the objects to score.
 
@@ -603,8 +615,8 @@ class KgeModel(KgeBase):
     ) -> Tensor:
         r"""Combine `score_sp` and `score_po`.
 
-        `s`, `p` and `o` are vectors of common size :math:`n`, holding the indexes of
-        the subjects, relations, and objects to score.
+        `s`, `p`, `o` and `t` are vectors of common size :math:`n`, holding the indexes of
+        the subjects, relations, objects, and times to score.
 
         Each sp-pair and each po-pair is scored against the entities in `entity_subset`
         (also holds indexes). If set to `entity_subset` is `None`, scores against all
@@ -614,8 +626,8 @@ class KgeModel(KgeBase):
         :code:`score_sp(s,p,entity_subset)` and :code:`score_po(p,o,entity_subset)`.
         I.e., returns an :math:`n\times 2E` tensor, where :math:`E` is the size of
         `entity_subset`. For :math:`j<E`, the :math:`(i,j)`-entry holds the score for
-        triple :math:`(s_i, p_i, e_j)`. For :math:`j\ge E`, the :math:`(i,j)`-entry
-        holds the score for triple :math:`(e_{j-E}, p_i, o_i)`.
+        triple :math:`(s_i, p_i, e_j, t_i)`. For :math:`j\ge E`, the :math:`(i,j)`-entry
+        holds the score for triple :math:`(e_{j-E}, p_i, o_i, t_i)`.
 
         """
 
