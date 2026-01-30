@@ -9,7 +9,7 @@ from kge import Config, Dataset
 
 def _get_annotation_from_trace(exp_dir):
     trace_file = os.path.join(exp_dir, 'trace.yaml')
-    save_file = os.path.join(exp_dir, 'annotation.tsv')
+    save_file = os.path.join(exp_dir, 'annotation.txt')
 
     with open(trace_file, 'r') as fr:
         with open(save_file, 'w') as fw:
@@ -32,7 +32,7 @@ def _get_annotation_from_trace(exp_dir):
 
 
 def _get_annotation(exp_dir, entry_list):
-    save_file = os.path.join(exp_dir, 'annotation.tsv')
+    save_file = os.path.join(exp_dir, 'annotation.txt')
 
     with open(save_file, 'w') as fw:
         for entry in entry_list:
