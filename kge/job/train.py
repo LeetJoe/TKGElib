@@ -331,6 +331,10 @@ class TrainingJob(Job):
         if "lr_scheduler_state_dict" in checkpoint:
             # new format
             self.kge_lr_scheduler.load_state_dict(checkpoint["lr_scheduler_state_dict"])
+
+        # self.optimizer = KgeOptimizer.create(self.config, self.model)
+        # self.kge_lr_scheduler = KgeLRScheduler(self.config, self.optimizer)
+
         self.epoch = checkpoint["epoch"]
         self.valid_trace = checkpoint["valid_trace"]
         self.model.train()

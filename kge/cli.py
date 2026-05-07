@@ -304,6 +304,17 @@ def main():
             # let's go
             if args.command == "resume":
                 if checkpoint_file is not None:
+
+                    # if config.exists("train.optimizer_args.schedule"):
+                    #     import math
+                    #     config.set("train.max_epochs", 310)
+                    #     data_size_scale = 1
+                    #     if not config.exists("train.optimizer_args.t_total"):
+                    #         config.set("train.optimizer_args.t_total",
+                    #                 math.ceil(dataset.split(config.get("train.split")).size(0) * data_size_scale
+                    #                             / config.get("train.batch_size")) * config.get("train.max_epochs"),
+                    #                 create=True, log=True)
+
                     checkpoint = load_checkpoint(
                         checkpoint_file, config.get("job.device")
                     )
