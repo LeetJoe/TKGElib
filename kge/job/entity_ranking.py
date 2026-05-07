@@ -707,7 +707,7 @@ num_ties for each true score.
 def _get_test_prediction_from_trace(job: Job, trace_entry):
     exp_dir = job.config.folder
     trace_file = os.path.join(exp_dir, 'trace.yaml')
-    save_file = os.path.join(exp_dir, 'pred_kge.tsv')
+    save_file = os.path.join(exp_dir, 'pred_kge.txt')
 
     save_dict = {}
     with open(trace_file, 'r') as fr:
@@ -732,7 +732,7 @@ def _get_test_prediction_from_trace(job: Job, trace_entry):
 
 def _get_test_prediction(job: EntityRankingJob, trace_entry):
     exp_dir = job.config.folder
-    save_file = os.path.join(exp_dir, 'pred_kge.tsv')
+    save_file = os.path.join(exp_dir, 'pred_kge.txt')
 
     with open(save_file, 'w') as fw:
         for entry in job.entry_list:
