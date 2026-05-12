@@ -5,6 +5,7 @@ import os
 import sys
 import traceback
 import yaml
+import math
 
 from kge import Dataset
 from kge import Config
@@ -13,7 +14,7 @@ from kge.misc import get_git_revision_short_hash, kge_base_dir, is_number
 from kge.util.dump import add_dump_parsers, dump
 from kge.util.io import get_checkpoint_file, load_checkpoint
 from kge.util.package import package_model, add_package_parser
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6'
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 def argparse_bool_type(v):
@@ -109,6 +110,9 @@ def create_parser(config, additional_args=[]):
     parser_resume = subparsers.add_parser(
         "resume", help="Resume a prior job", parents=[parser_conf]
     )
+    parser_continue = subparsers.add_parser(
+        "continue", help="Continue training a prior job", parents=[parser_conf]
+    )
     parser_eval = subparsers.add_parser(
         "eval", help="Evaluate the result of a prior job", parents=[parser_conf]
     )
@@ -127,7 +131,7 @@ def create_parser(config, additional_args=[]):
         help="Score the hidden data using trained model",
         parents=[parser_conf],
     )
-    for p in [parser_resume, parser_eval, parser_valid, parser_test, parser_infer]:
+    for p in [parser_resume, parser_continue, parser_eval, parser_valid, parser_test, parser_infer]:
         p.add_argument("config", type=str)
         p.add_argument(
             "--checkpoint",
@@ -162,14 +166,24 @@ def main():
     # process meta-commands
     process_meta_command(args, "create", {"command": "start", "run": False})
     process_meta_command(args, "eval", {"command": "resume", "job.type": "eval"})
+    process_meta_command(args, "eval", {"command": "continue", "job.type": "eval"})
     process_meta_command(
         args, "test", {"command": "resume", "job.type": "eval", "eval.split": "test"}
+    )
+    process_meta_command(
+        args, "test", {"command": "continue", "job.type": "eval", "eval.split": "test"}
     )
     process_meta_command(
         args, "valid", {"command": "resume", "job.type": "eval", "eval.split": "valid"}
     )
     process_meta_command(
+        args, "valid", {"command": "continue", "job.type": "eval", "eval.split": "valid"}
+    )
+    process_meta_command(
         args, "infer", {"command": "resume", "job.type": "infer", "infer.split": "infer"}
+    )
+    process_meta_command(
+        args, "infer", {"command": "continue", "job.type": "infer", "infer.split": "infer"}
     )
     # dump command
     if args.command == "dump":
@@ -196,7 +210,7 @@ def main():
         config.load(args.config)
 
     # resume command
-    if args.command == "resume":
+    if args.command == "resume" or args.command == "continue":
         if os.path.isdir(args.config) and os.path.isfile(args.config + "/config.yaml"):
             args.config += "/config.yaml"
         if args.verbose != False:
@@ -286,25 +300,25 @@ def main():
             dataset = Dataset.create(config)
 
             # let's go
-            if args.command == "resume":
+            if args.command == "resume" or args.command == "continue":
                 if checkpoint_file is not None:
-
-                    # if config.exists("train.optimizer_args.schedule"):
-                    #     import math
-                    #     config.set("train.max_epochs", 310)  # modify max epochs
-                    #     data_size_scale = 1
-                    #     if not config.exists("train.optimizer_args.t_total"):
-                    #         config.set("train.optimizer_args.t_total",
-                    #                 math.ceil(dataset.split(config.get("train.split")).size(0) * data_size_scale
-                    #                             / config.get("train.batch_size")) * config.get("train.max_epochs"),
-                    #                 create=True, log=True)
-
                     checkpoint = load_checkpoint(
                         checkpoint_file, config.get("job.device")
                     )
+                    if args.command == "continue":
+                        config.set("train.max_epochs", checkpoint["epoch"] + config.get("train.continue_epochs"), log=True)
+                        # print(checkpoint["epoch"], config.get("train.max_epochs"), config.get("train.continue_epochs"))
+                        data_size_scale = 1
+                        config.set("train.optimizer_args.t_total",
+                                math.ceil(dataset.split(config.get("train.split")).size(0) * data_size_scale
+                                            / config.get("train.batch_size")) * config.get("train.max_epochs"),
+                                create=True, log=True)
+
                     job = Job.create_from(
                         checkpoint, new_config=config, dataset=dataset
                     )
+                    if args.command == "continue":
+                        job.re_optimize()
                 else:
                     job = Job.create(config, dataset)
                     job.config.log(

@@ -170,6 +170,9 @@ train:
   # Maximum number of epochs used for training
   max_epochs: 20
 
+  # Continue number of epochs used for continuing training
+  continue_epochs: 10
+
   # Batch size used for training.
   batch_size: 100
 

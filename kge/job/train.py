@@ -328,9 +328,6 @@ class TrainingJob(Job):
             # new format
             self.kge_lr_scheduler.load_state_dict(checkpoint["lr_scheduler_state_dict"])
 
-        # self.optimizer = KgeOptimizer.create(self.config, self.model)
-        # self.kge_lr_scheduler = KgeLRScheduler(self.config, self.optimizer)
-
         self.epoch = checkpoint["epoch"]
         self.valid_trace = checkpoint["valid_trace"]
         self.model.train()
@@ -343,6 +340,10 @@ class TrainingJob(Job):
                 checkpoint["file"], self.resumed_from_job_id
             )
         )
+
+    def re_optimize(self):
+        self.optimizer = KgeOptimizer.create(self.config, self.model)
+        self.kge_lr_scheduler = KgeLRScheduler(self.config, self.optimizer)
 
     def run_epoch(self) -> Dict[str, Any]:
         "Runs an epoch and returns a trace entry."
